@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-23（LB-004 排列层：卡片候选 → `Layout`，PR 见本仓库 `agent/lb-layout-*` 分支）
+> 最近更新：2026-11-23（LB-005 语法层：`Layout` → `Ast` + P0 文法文档，PR 见本仓库 `agent/lb-parser-*` 分支）
 
 ## 1. 已验证
 
@@ -52,15 +52,20 @@
 | LB-004 排列层测试与本地检查 | `PYTHON=/tmp/lb-venv/bin/python bash scripts/check.sh` → `compileall` 通过、`259 passed, 2 skipped in 93.55s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.x；跳过的 2 项是只有装 OpenCV 才跑的两条交叉核对）；其中新增排列层 67 例：`tests/test_layout_protocol.py` 24、`tests/test_layout_arrange.py` 21、`tests/test_layout_fixtures.py` 13、`tests/test_layout_cli.py` 9（单独跑 `python -m pytest tests/test_layout_*.py` → `67 passed in 3.10s`） | LB-004 PR |
 | LB-004 CI 对 PR 显示检查结果 | PR #13 的 `ci` 工作流（run 45193979675）两个矩阵任务均通过：`check (python 3.11)` pass（1m24s，`259 passed, 2 skipped in 66.15s`，解释器 Python 3.11.18）、`check (python 3.13)` pass（1m45s，`259 passed, 2 skipped in 92.43s`，解释器 Python 3.13.18），各自执行 `bash scripts/check.sh` 并以「==> 检查通过」结束；跳过的 2 项与 LB-002/LB-003 相同，是只有装 OpenCV 才跑的交叉核对 | LB-004 PR #13 |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，以及 **LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照；仍未包含**解析、执行、界面**（LB-005 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
+| LB-005 语法层：`Layout`（§4）→ `Ast`（§5），P0 最小文法「语句序列 + 字面参数」，错误定位到行/槽位/卡片 | 实现见 `src/liveblocks/parser/`（`grammar.py` 机器可读文法 + 文档核对、`ast.py` 数据模型与 §5 校验、`parse.py` 解析、`report.py` 自检报告）；`python -m liveblocks parse ast --layout fixtures/ast/valid-basic.json` 输出 §5 的 `Ast`（3 条语句 / 7 个节点 / 0 诊断）；`python -m liveblocks parse report --dir fixtures/ast` 打印 8 个夹具的逐条结果与三条验收对照，退出码 0 | LB-005 PR |
+| LB-005 合法样例得到符合 §5 的 AST | `python -m liveblocks parse report --dir fixtures/ast` 的 3 个合法夹具全部 `§5 校验通过`：`valid-basic`（3 语句 / 7 节点）、`valid-empty`（0 语句的空程序）、`from-overlap-cards`（1 语句 / 2 节点，LB-004 的真实排列输出）；`tests/test_parser_fixtures.py::test_fixture_parses_to_the_declared_outcome`（8 例参数化）逐节点断言 `span` + `origin` 齐全并调 `validate_ast`；`tests/test_parser_ast.py::test_ast_document_matches_section5_shape`、`test_validate_ast_accepts_section5_example_shape` 用 §5 示例形状做正例 | LB-005 PR |
+| LB-005 非法样例产出带 `span` 与 `origin` 的 `LB-P0xx` 诊断且不崩溃 | 5 个非法夹具覆盖全部 5 个码：`from-multi-row-cards`（`LB-P002`+`LB-P004`，上游真实排列）、`invalid-number-first`（`LB-P001`）、`invalid-control-flow`（`LB-P004`×2）、`invalid-operator-arg`（`LB-P005`）、`invalid-empty-slot`（`LB-P003`×2）；每条诊断都带 `span`（行 + 槽位区间）与 `origin`（`candidate_id` + `card_face`），解析返回**部分 AST**、不抛异常（`tests/test_parser_parse.py`、`tests/test_parser_fixtures.py::test_invalid_fixtures_never_raise`）；`liveblocks parse ast --layout fixtures/ast/invalid-control-flow.json --fail-on-error` → 退出码 1（默认 0，诊断随 Ast 输出） | LB-005 PR |
+| LB-005 文法定义有独立文档并可被测试引用 | `docs/GRAMMAR.md`（草案 `grammar_version` 0.0.1：产生式、16 张卡的角色表、AST 形状与 `span`/`origin` 约定、`LB-P001`…`LB-P005` 码表、8 条协议缺口）；`src/liveblocks/parser/grammar.py::grammar_document_gaps` 逐项核对文档里的产生式、节点名、5 个诊断码（含标题）与全部卡面角色，`parse report` 打印「文法文档缺口 0 项」；`tests/test_parser_grammar.py`（17 例）含 3 例**反向验证**（删掉一个诊断码 / 一行产生式 / 一张卡面后必须报缺口），因此「文档与实现一致」不是假通过 | LB-005 PR |
+| LB-005 语法层测试与本地检查 | `PYTHON=/tmp/lb-venv-parser/bin/python bash scripts/check.sh` → `compileall` 通过、`372 passed, 2 skipped in 93.00s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.2.0；跳过的 2 项与 LB-002/LB-003/LB-004 相同，是只有装 OpenCV 才跑的交叉核对）；其中新增语法层 113 例：`tests/test_parser_grammar.py` 17、`tests/test_parser_ast.py` 35、`tests/test_parser_parse.py` 22、`tests/test_parser_fixtures.py` 26、`tests/test_parser_cli.py` 13 | LB-005 PR |
+
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，以及 **LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照；仍未包含**规范化 IR、执行、界面**（LB-006 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块与排列层，没有解析及其后面的任何模块）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 / LB-005 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块、排列层与语法层，没有规范化 IR 及其后面的任何模块）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-005 | 语法解析（→ AST） | 计划中（可直接消费 LB-004 的 `Layout`） |
 | LB-006 | 规范化 IR | 计划中 |
 | LB-007 | 模拟执行器 | 计划中 |
 | LB-008 | 调试界面（分层可视化） | 计划中 |
@@ -86,7 +91,7 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有解析、执行、界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块与 LB-004 排列层（含 6 个场景 fixtures 的识别统计与 4 个候选夹具的排列验收），但**没有解析、执行、界面**，因此任何「能执行」「能显示」的说法目前都不成立。
+- **还没有规范化 IR、执行、界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层与 LB-005 语法层（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收与 8 个语法夹具的解析验收），但**没有 IR 规范化、执行、界面**，因此任何「能执行」「能显示」的说法目前都不成立。
 - **LB-003 只在合成图上验证过**：所有识别结论都来自 LB-002 的合成灰度图（无镜头畸变、无运动模糊）。真实摄像头的鲁棒性（反光、阴影、透视更大、运动模糊）没有证据，属 LB-010/LB-020。
 - **LB-003 已知的识别偏差（如实计入统计，不隐藏）**：
   1. `overlap` 场景 3 张卡只识别出 1 张：标记 12 完全漏检（标记被纸片/卡片盖住），标记 6 检出形状但码字不可译码（报 `occluded` 候选）；
@@ -97,16 +102,24 @@
   1. 排列阈值需要长度尺度，而 §4/§3.2 只给了 `center_px`：本实现用「各候选到最近邻距离的中位数」当典型卡距（自适应），
      因此**只有两张卡、或两行贴得比卡距还近时无法判歧义**，这类场景需用 `--pitch-px` 显式给预期卡距；
   2. 行分簇是一维间隙聚类，**不做透视矫正**：桌面倾斜导致同一行的 y 跨度超过约一个卡距时会被切成两行（此时会报 `LB-L004` 提示，而不是静默出错）；
-  3. `ttb_ltr` 下「一行」在画面上是一列，是本实现对 §4 的解释；若解析层（LB-005）按「横排才叫行」实现需要先对齐；
+  3. `ttb_ltr` 下「一行」在画面上是一列，是本实现对 §4 的解释；LB-005 解析层只按 `rows`/`slots` 的顺序读（与几何无关），因此两种解释下都一致，但若将来把「一行」改成严格横排，解析层要一起改；
   4. 朝向归一依赖注册象限，而 LB-003 当前所有卡的象限都是 0（注册信息），「卡片实体转 90°」尚未在实测中出现；
   5. `fixtures/layouts` 里的 `spacing-ambiguity.json` / `duplicates.json` 是**手写**夹具（§3.4 的唯一例外，原因见 `fixtures/README.md` §4），
      LB-002 的场景预设不产生这两种候选形态。
 - **LB-003 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-014 —— §3 没有 `diagnostics` 槽位、`status` 无法表达多事实冲突、`orientation_quadrant` 没有「未知」表示、§0 的 `schema_version`（`major.minor`）与示例（`0.0.1`）不一致、§0 的「逆时针为正」与相机坐标系 y 向下冲突、§3.2 缺 `card_id`、§3.1 的 `pose` 未定义必填性与精度。
 - **LB-002 已知局限**（详见 `docs/DECISIONS.md` D-012）：只出 8bit 灰度图；相机是针孔 + 无畸变（畸变留给 LB-010）；遮挡物只支持凸四边形；卡片数、字典与版式是临时假设（Q1 未定，临时固定 `DICT_4X4_50` + 16 张卡）。
 - **LB-002 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（LB-002 的条目仍按原样描述，实现落在 `src/liveblocks/synth/`）。
+- **LB-005 已知限制（详见 `docs/DECISIONS.md` D-016 与 `docs/GRAMMAR.md`）**：
+  1. P0 文法只有「语句序列 + 字面参数」：`repeat` / `if` / `end` 报 `LB-P004`、运算符卡报 `LB-P005`，还没法表达表达式、变量、循环与条件；
+  2. **不检查参数个数（arity）**：§5 与 D-005 都没定义每条命令收几个参数，解析一律接受零个或多个字面参数，arity 留给 LB-006；
+  3. 错误恢复是「整行丢弃 + 只报第一条」：被丢掉那行里合法的卡也不会进 AST（诊断的 `span`/`origin` 能指回原卡，原 `Layout` 也仍在运行记录里）；
+  4. 「一行 = 一条语句」是本实现对 §4 `rows` 的读法：与 D-015「`ttb_ltr` 下的一行是画面上的一列」兼容（本层只看 `rows`/`slots` 顺序），但若将来把「一行」改成严格横排，本层要一起改；
+  5. `fixtures/ast` 里 6 个手写夹具是同类例外（LB-002/LB-003/LB-004 的现有夹具凑不出「数字卡打头」「运算符占参数位」这类语法错误），另外 2 个是 LB-004 真实输出的快照。
+- **LB-005 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-016 —— §5 示例的 `Program.span` 与其槽位数自相矛盾、没定义跨行 `span`、没定义多卡 `origin`、示例的 `Number` 节点缺 `origin`、没有 `frame_id`（或上游引用）、`node` 开放枚举缺降级口径、`LB-P0xx` 只举了 `LB-P003` 一个例子、字面量只能是整数。
+- **LB-005 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/parser/`，LB-006 起的条目原样保留）。
 - **LB-004 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/layout/`，LB-005 起的条目原样保留）。
 - **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
-- **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点。
+- **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点（LB-005 的 P0 文法按 D-005 的方向落地，取舍与缺口见 D-016）。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。
 - **本单不派发后续工单**：ROADMAP 条目只是 backlog，开新 Issue 需仓库所有者确认（`AGENTS.md` §5）。
 

@@ -1,0 +1,124 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Layout",
+  "frame_id": "f-multi-row",
+  "reading_direction": "ltr_ttb",
+  "rows": [
+    {
+      "row_index": 0,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-2",
+          "card_face": "move-forward",
+          "orientation_quadrant": 0,
+          "x_px": 257,
+          "y_px": 206,
+          "confidence": 1.0
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-1",
+          "card_face": "number-1",
+          "orientation_quadrant": 0,
+          "x_px": 322,
+          "y_px": 201,
+          "confidence": 1.0
+        },
+        {
+          "slot_index": 2,
+          "candidate_id": "c-0",
+          "card_face": "jump",
+          "orientation_quadrant": 0,
+          "x_px": 383,
+          "y_px": 200,
+          "confidence": 1.0
+        }
+      ]
+    },
+    {
+      "row_index": 1,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-4",
+          "card_face": "repeat",
+          "orientation_quadrant": 0,
+          "x_px": 257,
+          "y_px": 275,
+          "confidence": 1.0
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-5",
+          "card_face": "number-2",
+          "orientation_quadrant": 0,
+          "x_px": 318,
+          "y_px": 275,
+          "confidence": 1.0
+        },
+        {
+          "slot_index": 2,
+          "candidate_id": "c-3",
+          "card_face": "end",
+          "orientation_quadrant": 0,
+          "x_px": 384,
+          "y_px": 271,
+          "confidence": 1.0
+        }
+      ]
+    }
+  ],
+  "basis": {
+    "pitch_px": 61.008,
+    "thresholds_px": {
+      "duplicate": 21.353,
+      "row_gap": 45.756,
+      "row_span": 61.008,
+      "row_ambiguous": 54.907,
+      "slot_gap": 36.605
+    },
+    "reading_frame": {
+      "line_axis": "y",
+      "order_axis": "x",
+      "order_sign": 1,
+      "upright_quadrant": 0,
+      "description": "行自上而下，行内自左向右"
+    },
+    "counts": {
+      "input": 6,
+      "placed": 6,
+      "removed_duplicates": 0,
+      "excluded_unknown_identity": 0
+    },
+    "rows": [
+      {
+        "row_index": 0,
+        "candidate_ids": [
+          "c-2",
+          "c-1",
+          "c-0"
+        ],
+        "line_center_px": 202.333,
+        "order_span_px": [
+          257.0,
+          383.0
+        ]
+      },
+      {
+        "row_index": 1,
+        "candidate_ids": [
+          "c-4",
+          "c-5",
+          "c-3"
+        ],
+        "line_center_px": 273.667,
+        "order_span_px": [
+          257.0,
+          384.0
+        ]
+      }
+    ]
+  },
+  "diagnostics": []
+}

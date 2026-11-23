@@ -84,7 +84,36 @@ python -m liveblocks synth verify --dir fixtures/scenes
   liveblocks layout report --dir fixtures/layouts
   ```
 
-## 5. 约定
+## 5. `ast/`（LB-005 语法夹具）
+
+语法层（LB-005）的输入是协议 §4 的 `Layout`，因此夹具是**Layout JSON**（不是图像，也不是卡片
+候选），一旁配一份清单 `ast/index.json` 说明每个夹具「期望合法还是非法、几条语句、哪些诊断码」。
+解析器只吃 §4 文档，不含任何夹具元数据——期望值放清单里，夹具本身仍是 100% 合规的 §4 对象。
+
+| 夹具 | 期望 | 语句 | 诊断 | 来源 |
+| --- | --- | --- | --- | --- |
+| `valid-basic.json` | 合法 | 3 | 无 | **手写**：三条语句，参数 1 / 2 / 0 个各一条 |
+| `valid-empty.json` | 合法 | 0 | 无 | **手写**：没有任何行 → 空程序 |
+| `from-overlap-cards.json` | 合法 | 1 | 无 | **真跑出来的**：`liveblocks layout arrange --candidates fixtures/layouts/overlap-cards.json` 的输出原样入库 |
+| `from-multi-row-cards.json` | 非法 | 0 | `LB-P002`、`LB-P004` | 同上，输入换成 `multi-row-cards.json`：`jump` 占了参数位、`repeat` 占了语句位 |
+| `invalid-number-first.json` | 非法 | 1 | `LB-P001` | **手写**：第 2 行以数字卡开头（缺命令卡），第 1 行照常解析 |
+| `invalid-control-flow.json` | 非法 | 1 | `LB-P004`×2 | **手写**：`repeat` / `end` 作为语句头 |
+| `invalid-operator-arg.json` | 非法 | 1 | `LB-P005` | **手写**：`operator-add` 占参数位（P0 不做表达式） |
+| `invalid-empty-slot.json` | 非法 | 1 | `LB-P003`×2 | **手写**：空卡面与字典里没有的卡面 `hologram` |
+
+- 两个 `from-*.json` 是**上游快照**：`tests/test_parser_fixtures.py::test_pipeline_fixtures_match_fresh_arrangement`
+  会用当前排列层重跑并逐字段比对，LB-004 变了会立刻失败；要更新就重跑上面的 `layout arrange` 覆盖文件。
+- 手写的 6 个是同类例外（`fixtures/layouts` 的候选夹具只覆盖「重复」「间距歧义」等形态，凑不出
+  「数字卡打头」「运算符占参数位」这类语法错误）：它们都是合法 §4 文档，测试会先用
+  `validate_layout` 校验再断言诊断码。
+- 校验命令：
+
+  ```bash
+  # 跑全部语法夹具，打印逐条结果与验收对照（退出码 0 = 三条验收全过）
+  liveblocks parse report --dir fixtures/ast
+  ```
+
+## 6. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

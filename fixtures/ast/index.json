@@ -1,0 +1,85 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "AstFixtureIndex",
+  "grammar_version": "0.0.1",
+  "note": "LB-005 语法夹具清单：每项是本目录里的一份 Layout（协议 §4）与它的期望解析结果。valid = 应得到无诊断的 Ast；invalid = 应产出列出的 LB-P0xx 诊断（码顺序即产出顺序）。from-*.json 是 LB-004 在 fixtures/layouts 上的真实排列输出（上游快照），其余为手写。",
+  "fixtures": [
+    {
+      "name": "valid-basic.json",
+      "expect": "valid",
+      "statements": 3,
+      "codes": [],
+      "source": "手写 Layout",
+      "note": "三条语句：0/1/2 个字面参数各一条"
+    },
+    {
+      "name": "valid-empty.json",
+      "expect": "valid",
+      "statements": 0,
+      "codes": [],
+      "source": "手写 Layout",
+      "note": "空程序：没有任何行，Program.body 为空"
+    },
+    {
+      "name": "from-overlap-cards.json",
+      "expect": "valid",
+      "statements": 1,
+      "codes": [],
+      "source": "liveblocks layout arrange --candidates fixtures/layouts/overlap-cards.json",
+      "note": "LB-004 的真实输出：一行一条 move-back（上游 LB-L003 诊断不进语法层）"
+    },
+    {
+      "name": "from-multi-row-cards.json",
+      "expect": "invalid",
+      "statements": 0,
+      "codes": [
+        "LB-P002",
+        "LB-P004"
+      ],
+      "source": "liveblocks layout arrange --candidates fixtures/layouts/multi-row-cards.json",
+      "note": "LB-004 的真实输出：jump 占了参数位（LB-P002）、repeat 占了语句位（LB-P004）"
+    },
+    {
+      "name": "invalid-number-first.json",
+      "expect": "invalid",
+      "statements": 1,
+      "codes": [
+        "LB-P001"
+      ],
+      "source": "手写 Layout",
+      "note": "第 2 行以数字卡开头（缺命令卡）；第 1 行照常解析成语句"
+    },
+    {
+      "name": "invalid-control-flow.json",
+      "expect": "invalid",
+      "statements": 1,
+      "codes": [
+        "LB-P004",
+        "LB-P004"
+      ],
+      "source": "手写 Layout",
+      "note": "repeat 与 end 作为语句头；P0 没有块的概念"
+    },
+    {
+      "name": "invalid-operator-arg.json",
+      "expect": "invalid",
+      "statements": 1,
+      "codes": [
+        "LB-P005"
+      ],
+      "source": "手写 Layout",
+      "note": "operator-add 占参数位；P0 只做字面参数，不做表达式"
+    },
+    {
+      "name": "invalid-empty-slot.json",
+      "expect": "invalid",
+      "statements": 1,
+      "codes": [
+        "LB-P003",
+        "LB-P003"
+      ],
+      "source": "手写 Layout",
+      "note": "空卡面（card_face 为空串）与字典里没有的卡面 hologram"
+    }
+  ]
+}

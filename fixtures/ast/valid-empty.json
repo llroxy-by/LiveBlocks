@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Layout",
+  "frame_id": "f-valid-empty",
+  "reading_direction": "ltr_ttb",
+  "rows": [],
+  "diagnostics": []
+}
