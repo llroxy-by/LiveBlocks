@@ -4,8 +4,8 @@
 
 ## 现状
 
-- 已完成 **LB-001 工程骨架**与 **LB-002 合成卡片图像生成器**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像，并输出配套真值 JSON；固定随机种子时生成结果字节可复现。
-- 仓库**还没有识别、排列、解析、执行、界面**（LB-003 起），因此目前不能说「能识别」「能执行」。
+- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**与 **LB-003 识别模块**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计。
+- 仓库**还没有排列、解析、执行、界面**（LB-004 起），因此目前不能说「能执行」「能显示」。识别只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -29,7 +29,7 @@ python -m pip install -e '.[dev]'
 python -m pytest
 ```
 
-跑本地检查（与 CI 同一套检查：语法编译检查 + 全量测试，含合成卡片生成器与 fixtures 可复现性）：
+跑本地检查（与 CI 同一套检查：语法编译检查 + 全量测试，含合成卡片生成器、fixtures 可复现性与识别模块）：
 
 ```bash
 bash scripts/check.sh
@@ -74,6 +74,36 @@ python -m liveblocks synth verify --dir fixtures/scenes
 `python -m pip install -e '.[dev,aruco]'` 让测试用 OpenCV 逐位核对入库的 ArUco 位表
 （CI 只装 `.[dev]`，该交叉核对用例会自动跳过）。
 
+## 识别模块（LB-003）
+
+把一张灰度图变成「卡片候选」：局部自适应二值化 → 暗区连通域 → 凸包化简成四边形 → 亚像素边缘
+细化 → 6×6 模块采样与 `DICT_4X4_50` 码字比对 → 卡片字典映射与状态判定（`ok` / `clipped` /
+`occluded` / `ambiguous` / `unknown_card`）。**不做排序、不解析、不执行**（那是 LB-004 起的活）。
+
+```bash
+# 单张图识别，直接打印协议 §3.2 的 CardCandidateList JSON
+liveblocks recognize detect --image fixtures/scenes/normal.png
+
+# 输出标记层（§3.1）；给了内参才会附上位姿（粗值，小标记不输出）
+liveblocks recognize detect --image fixtures/scenes/normal.png --emit markers --intrinsics 700,700,320,240
+
+# 换一份少了某张卡的字典 → 该标记被标成 unknown_card
+liveblocks recognize detect --image fixtures/scenes/normal.png --card-dictionary /tmp/cards-without-C01.json
+
+# 对全部 fixtures 跑识别，打印准确率 / 漏检统计（含验收对照）
+liveblocks recognize report --dir fixtures/scenes
+```
+
+当前实测（`fixtures/scenes`，6 个场景 17 张卡）：识别 15、未识别 1、漏检 1、误检 0，
+召回率 88.2%、精确率 100%；「正常」样例无漏检、「裁切」样例 2/2 标 `clipped`。唯一漏检与唯一
+未识别都出现在 `overlap`（纸片压住一张卡的标记、另一张卡的标记被后画的卡盖住），如实计入统计而
+不做粉饰。取舍与已知限制见 [docs/DECISIONS.md](docs/DECISIONS.md) D-013/D-014 与
+[docs/PROGRESS.md](docs/PROGRESS.md) §4。
+
+运行时仍然**零依赖**：检测与译码只用到标准库（自带 4 点单应、连通域、码字位表）。可选装
+`python -m pip install -e '.[dev,aruco]'` 让测试用 OpenCV 的 ArUco 检测器当独立实现交叉核对我们
+的检出与角点（CI 只装 `.[dev]`，这组用例自动跳过）。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -105,9 +135,10 @@ python -m liveblocks synth verify --dir fixtures/scenes
 ├── src/liveblocks/       # 实现包
 │   ├── __init__.py
 │   ├── __main__.py       # python -m liveblocks
-│   ├── cli.py            # liveblocks --version / synth list|generate|verify
+│   ├── cli.py            # liveblocks --version / synth … / recognize …
 │   ├── data/             # 卡片字典、ArUco 位表、版式定义、点阵字体（JSON）
-│   └── synth/            # LB-002 合成卡片图像生成器（不做识别）
+│   ├── synth/            # LB-002 合成卡片图像生成器（不做识别）
+│   └── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
 ├── tests/                # pytest 用例，testpaths = tests
 ├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成卡片图像与真值）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令

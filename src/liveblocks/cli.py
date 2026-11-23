@@ -1,10 +1,11 @@
 """命令行入口。
 
-骨架阶段（LB-001）只有 ``--version``；LB-002 加入 ``synth`` 子命令组：
+- 骨架阶段（LB-001）：``--version``；
+- LB-002：``synth`` 子命令组（``list`` / ``generate`` / ``verify``）；
+- LB-003：``recognize`` 子命令组：
 
-- ``liveblocks synth list``                     列出场景预设与卡片字典
-- ``liveblocks synth generate --scene all``      按固定种子生成图像 + 真值 JSON
-- ``liveblocks synth verify``                    重生成并与入库 fixtures 比对
+  - ``liveblocks recognize detect --image <png>``   输出符合 `docs/PROTOCOL.md` §3 的 JSON
+  - ``liveblocks recognize report``                 对 fixtures 目录跑识别并打印准确率/漏检统计
 
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
@@ -68,6 +69,59 @@ def build_parser() -> argparse.ArgumentParser:
         help="强制使用该种子重生成（默认用真值里记录的种子）",
     )
     verify.set_defaults(handler=_cmd_synth_verify)
+
+    recognize = subparsers.add_parser(
+        "recognize",
+        help="识别模块（LB-003）：ArUco 标记候选 → 卡片候选",
+        description="对一张灰度图做标记检测与卡片字典映射，输出协议 §3 的候选列表 JSON。",
+    )
+    recognize_sub = recognize.add_subparsers(dest="recognize_command", required=True)
+
+    detect = recognize_sub.add_parser("detect", help="识别单张图片，输出候选列表 JSON")
+    detect.add_argument("--image", type=Path, required=True, help="输入 PNG（8bit 灰度）")
+    detect.add_argument("--frame-id", default=None, help="帧标识（默认由文件名推导 f-<主干>）")
+    detect.add_argument(
+        "--card-layout",
+        default=None,
+        help="采集用的卡面版式（默认取 synth_layouts.json 的 default_card_layout）",
+    )
+    detect.add_argument(
+        "--card-dictionary",
+        type=Path,
+        default=None,
+        help="替换卡片字典文件（格式同 data/card_dictionary.json，用于验证 unknown_card）",
+    )
+    detect.add_argument(
+        "--emit",
+        choices=("cards", "markers"),
+        default="cards",
+        help="输出哪个对象：cards（§3.2，默认）或 markers（§3.1）",
+    )
+    detect.add_argument(
+        "--intrinsics",
+        default=None,
+        help="相机内参 fx,fy,cx,cy；给了才会在 markers 里输出 pose",
+    )
+    detect.add_argument("--source", default="synthetic", help="帧来源（synthetic|camera|replay）")
+    detect.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    detect.set_defaults(handler=_cmd_recognize_detect)
+
+    report = recognize_sub.add_parser(
+        "report", help="对 fixtures 目录跑识别并输出准确率 / 漏检统计"
+    )
+    report.add_argument("--dir", type=Path, default=DEFAULT_SCENE_DIR, help="场景目录（默认 fixtures/scenes）")
+    report.add_argument(
+        "--card-layout",
+        default=None,
+        help="强制使用该卡面版式（默认按每个场景真值里的 card_layout，即采集配置）",
+    )
+    report.add_argument("--json", type=Path, default=None, help="把统计另存为 JSON")
+    report.add_argument(
+        "--no-intrinsics",
+        action="store_true",
+        help="不把真值里的相机内参当作采集配置传入（则输出不含 pose）",
+    )
+    report.set_defaults(handler=_cmd_recognize_report)
 
     return parser
 
@@ -154,6 +208,84 @@ def _cmd_synth_verify(args: argparse.Namespace) -> int:
         print(f"{flag} {row.name:<16} seed={row.seed:<10} {detail}{suffix}")
     print(f"\n{len(rows) - failures}/{len(rows)} 个场景与入库 fixtures 完全一致")
     return 0 if failures == 0 else 1
+
+
+def _parse_intrinsics(text: str):
+    from .vision import Intrinsics
+
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if len(parts) != 4:
+        raise SystemExit("--intrinsics 需要 4 个数：fx,fy,cx,cy")
+    try:
+        fx, fy, cx, cy = (float(part) for part in parts)
+    except ValueError as error:
+        raise SystemExit(f"--intrinsics 解析失败：{error}") from error
+    return Intrinsics(fx=fx, fy=fy, cx=cx, cy=cy)
+
+
+def _build_registry(card_layout: str | None, card_dictionary: Path | None):
+    from .vision import CardRegistry
+    from .vision.cards import load_card_dictionary_file
+
+    dictionary = None
+    if card_dictionary is not None:
+        dictionary = load_card_dictionary_file(card_dictionary)
+    return CardRegistry.load(card_dictionary=dictionary, capture_layout=card_layout)
+
+
+def _cmd_recognize_detect(args: argparse.Namespace) -> int:
+    import json
+
+    from .vision import recognize_path
+
+    if not args.image.is_file():
+        raise SystemExit(f"找不到图像：{args.image}")
+    registry = _build_registry(args.card_layout, args.card_dictionary)
+    intrinsics = _parse_intrinsics(args.intrinsics) if args.intrinsics else None
+    result = recognize_path(
+        args.image,
+        registry=registry,
+        frame_id=args.frame_id,
+        source=args.source,
+        intrinsics=intrinsics,
+    )
+    document = (result.cards if args.emit == "cards" else result.markers).to_dict()
+    text = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+    if args.out is None:
+        print(text, end="")
+        return 0
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(text, encoding="utf-8")
+    kind = document["kind"]
+    count = len(document["cards"]) if args.emit == "cards" else len(document["markers"])
+    print(f"写入 {args.out}（{kind}，{count} 项，frame_id={document['frame_id']}）")
+    return 0
+
+
+def _cmd_recognize_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .vision import evaluate_directory, format_report
+
+    registry = _build_registry(args.card_layout, None)
+    report = evaluate_directory(
+        args.dir,
+        registry=registry,
+        layout_override=args.card_layout,
+        intrinsics_from_truth=not args.no_intrinsics,
+    )
+    if not report.scenes:
+        print(f"{args.dir} 里没有可评估的合成场景真值")
+        return 1
+    text = format_report(report)
+    print(text, end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"统计已写入 {args.json}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

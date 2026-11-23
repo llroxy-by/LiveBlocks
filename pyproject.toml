@@ -19,8 +19,10 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-# 可选交叉核对：用 OpenCV 的 DICT_4X4_50 逐位校验入库位表、并确认合成图里的标记可被检出。
-# 只用于测试核对（tests/test_synth_dictionary.py 在装不到 opencv 时自动跳过），不是运行时依赖。
+# 可选交叉核对：用 OpenCV 的 DICT_4X4_50 逐位校验入库位表、确认合成图里的标记可被检出，
+# 并把 cv2.aruco 的检测结果当作**独立实现**交叉核对 LB-003 的识别输出。
+# 只用于测试核对（tests/test_synth_dictionary.py 与 tests/test_vision_opencv.py 在装不到
+# opencv 时自动跳过），不是运行时依赖。
 aruco = ["opencv-python-headless>=4.8"]
 
 [project.scripts]
