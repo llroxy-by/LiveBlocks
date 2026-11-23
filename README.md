@@ -4,8 +4,8 @@
 
 ## 现状
 
-- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**与 **LB-003 识别模块**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计。
-- 仓库**还没有排列、解析、执行、界面**（LB-004 起），因此目前不能说「能执行」「能显示」。识别只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
+- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**与 **LB-004 排列还原**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断）。
+- 仓库**还没有解析、执行、界面**（LB-005 起），因此目前不能说「能执行」「能显示」。识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -104,6 +104,29 @@ liveblocks recognize report --dir fixtures/scenes
 `python -m pip install -e '.[dev,aruco]'` 让测试用 OpenCV 的 ArUco 检测器当独立实现交叉核对我们
 的检出与角点（CI 只装 `.[dev]`，这组用例自动跳过）。
 
+## 排列层（LB-004）
+
+把识别层的卡片候选还原成「谁在第几行第几个位置」的 `Layout`（协议 §4）：**分簇**（按阅读方向的
+换行轴切行）、**排序**（行自上而下、行内按阅读方向）、**朝向归一**（折算成相对阅读方向的正立
+方向）、**去重**（同一身份的重复检出只留置信度最高的一个）与**歧义诊断**（间距过小的相邻槽位
+报 `LB-L001`，行分组边界存疑报 `LB-L004`，卡片放歪报 `LB-L005`）。**不解析语法**（那是 LB-005）。
+
+```bash
+# 卡片候选夹具 → Layout JSON（协议 §4）
+liveblocks layout arrange --candidates fixtures/layouts/multi-row-cards.json
+
+# 一步「识别 → 排列」（调试用；先识别再排列）
+liveblocks layout from-image --image fixtures/scenes/multi-row.png --card-layout card-40x40
+
+# 对全部候选夹具跑排列，打印行/槽位/诊断与验收对照
+liveblocks layout report --dir fixtures/layouts
+```
+
+当前实测（`fixtures/layouts`，4 个候选夹具）：两行样例的 6 张卡被正确分成 2×3；间距歧义样例产出
+1 条 `LB-L001`（点名 c-1、c-2）；重复候选样例去重后留 3 槽位并产出 `LB-L002`（点名被移除的 c-1）；
+每个槽位都带来源 `candidate_id`，没有一个候选既没进槽位也没被诊断点名。取舍与已知限制见
+[docs/DECISIONS.md](docs/DECISIONS.md) D-015 与 [docs/PROGRESS.md](docs/PROGRESS.md) §4。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -135,12 +158,13 @@ liveblocks recognize report --dir fixtures/scenes
 ├── src/liveblocks/       # 实现包
 │   ├── __init__.py
 │   ├── __main__.py       # python -m liveblocks
-│   ├── cli.py            # liveblocks --version / synth … / recognize …
+│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout …
 │   ├── data/             # 卡片字典、ArUco 位表、版式定义、点阵字体（JSON）
 │   ├── synth/            # LB-002 合成卡片图像生成器（不做识别）
-│   └── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
+│   ├── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
+│   └── layout/           # LB-004 排列层（卡片候选 → Layout、自检报告）
 ├── tests/                # pytest 用例，testpaths = tests
-├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成卡片图像与真值）
+├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```

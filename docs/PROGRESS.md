@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-23（LB-003 识别模块：ArUco 标记候选 → 卡片候选，PR 见本仓库 `agent/lb-recognition-*` 分支）
+> 最近更新：2026-11-23（LB-004 排列层：卡片候选 → `Layout`，PR 见本仓库 `agent/lb-layout-*` 分支）
 
 ## 1. 已验证
 
@@ -41,17 +41,26 @@
 | LB-003 位姿估计（可选） | 只有给了内参（`--intrinsics`）且标记可见边长 ≥ 24 px 才输出 `pose`；`tests/test_vision_pose.py`（10 例）对照真值：`normal`/`clipped`/`low-light`/`overlap`/`slight-rotation` 的深度 z 误差 ≤ 5%（实测 0.0%~3.1%），重投影误差 ≤ 1 px；未给内参或 `multi-row`（19 px 标记）时不输出 `pose` | LB-003 PR |
 | LB-003 CI 对 PR 显示检查结果 | PR #10 的 `ci` 工作流（run 45180592756）两个矩阵任务均通过：`check (python 3.11)` success（103.83s，`192 passed, 2 skipped`，解释器 Python 3.11.18）、`check (python 3.13)` success（91.80s，`192 passed, 2 skipped`，解释器 Python 3.13.18），各自执行 `bash scripts/check.sh` 并以「==> 检查通过」结束；跳过的 2 项是 `tests/test_vision_opencv.py` 与 `tests/test_synth_dictionary.py` 里需要 OpenCV 的交叉核对（CI 只装 `.[dev]`） | LB-003 PR #10 |
 | LB-002 入库 ArUco 位表与 OpenCV `DICT_4X4_50` 逐位一致 | 可选 extra：`python -m pip install -e '.[dev,aruco]'` 后 `python -m pytest tests/test_synth_dictionary.py` → `8 passed`，其中 `test_vendored_bit_patterns_match_opencv` 用 OpenCV 逐位核对 50 个码字；CI 只装 `.[dev]`，该用例自动 skip | 同上 |
+| LB-004 排列层：分簇 / 阅读方向排序 / 朝向归一 / 去重 / 歧义诊断 → `Layout`（§4） | 实现见 `src/liveblocks/layout/`（`protocol.py` 数据模型 + 最小校验、`arrange.py` 算法、`report.py` 自检报告）；`python -m liveblocks layout arrange --candidates fixtures/layouts/multi-row-cards.json` 输出 §4 的 `Layout`；`python -m liveblocks layout from-image --image fixtures/scenes/multi-row.png --card-layout card-40x40` 一步跑「识别 → 排列」（退出码 0，行 2 / 槽位 6） | LB-004 PR |
+| LB-004 两行样例被正确分成两行 | `python -m liveblocks layout report --dir fixtures/layouts` → `multi-row-cards 候选 6 → 行 2 / 槽位 6`，行 0 `c-2(move-forward@257,206) c-1(number-1@322,201) c-0(jump@383,200)`、行 1 `c-4(repeat@257,275) c-5(number-2@318,275) c-3(end@384,271)`，验收对照打印 `[通过] 两行样例被正确分成两行`；`tests/test_layout_fixtures.py::test_two_row_fixture_is_split_into_two_rows`、`test_end_to_end_from_image_to_layout`（直接用 LB-003 在 `multi-row.png` 上的识别结果，`frame_id=f-multi-row`） | LB-004 PR |
+| LB-004 间距歧义样例产出 `LB-L001` | 同上报告 `spacing-ambiguity 候选 4 → 行 1 / 槽位 4，诊断 1 条`：`LB-L001 warning: 候选 c-1 与 c-2 间距 38.0px 低于阈值 47.4px（行 0），排列顺序存疑 [c-1,c-2]`；`tests/test_layout_fixtures.py::test_spacing_ambiguity_fixture_yields_l001`、`tests/test_layout_arrange.py::test_spacing_ambiguity_emits_l001_with_both_ids`、`test_explicit_pitch_controls_thresholds`（显式 `pitch_px` 让 70px 间距被判歧义） | LB-004 PR |
+| LB-004 重复候选去重后有 `LB-L002` | 同上报告 `duplicates 候选 4 → 行 1 / 槽位 3，去重移除 1`：`LB-L002 info: 候选 c-0（move-forward）与 c-1 是同一张卡的重复检出（圆心距 ≤ 22.9px）：保留置信度最高的 c-0（0.92），移除 c-1 [c-0,c-1]`；`tests/test_layout_fixtures.py::test_duplicate_fixture_dedupes_with_l002_trace`、`tests/test_layout_arrange.py::test_duplicate_candidates_are_removed_with_l002`、`test_same_face_far_apart_is_not_a_duplicate`（同卡面但不重合的两张卡不去重） | LB-004 PR |
+| LB-004 所有排序结论可追溯到候选 id | 每个槽位带 `candidate_id` + `x_px/y_px`，`basis.rows[].candidate_ids` 给出每行的候选序列，`basis.counts` 给出输入/入槽/去重移除/身份未知四项计数；报告末行 `合计 4 个候选夹具 / 14 个槽位 / 未追溯候选 0 个`；`tests/test_layout_fixtures.py::test_every_fixture_layout_is_traceable`（4 个夹具参数化，断言「输入候选 ⊆ 槽位 ∪ 诊断点名」且槽位 id 都在输入内） | LB-004 PR |
+| LB-004 输出符合 §4，且未知枚举/字段按 §0 处理 | `tests/test_layout_protocol.py`（24 例）：断言槽位字段集合恰为 §4 那 7 个、坐标是整数像素、`orientation_quadrant ∈ 0..3`、`row_index`/`slot_index` 从 0 连续、`candidate_id` 不重复，并参数化 17 类违约文档必须被 `validate_layout` 拒绝、未知新增字段被容忍；报告与 CLI 出口都调同一个校验器 | LB-004 PR |
+| LB-004 身份未知的候选被排除但留痕（`LB-L003`，加法式） | `overlap-cards`（LB-003 在 `overlap.png` 上的真实输出，含 1 个 `occluded` 候选）：报告 `候选 2 → 行 1 / 槽位 1，身份未知 1`，诊断 `LB-L003 warning: 1 个候选身份未知，未纳入排列：c-0（occluded）…`；`tests/test_layout_fixtures.py::test_unknown_identity_fixture_is_traced_with_l003`、`tests/test_layout_arrange.py::test_unknown_identity_candidates_are_excluded_but_traced` | LB-004 PR |
+| LB-004 行分组歧义（`LB-L004`）与非正立（`LB-L005`）也有路径与测试 | `tests/test_layout_arrange.py::test_row_boundary_near_threshold_emits_l004`（两行间隙刚过切分阈值）、`test_merged_rows_span_emits_l004`（行内跨度超卡距 → 可能两行被并成一行）、`test_orientation_is_normalised_against_reading_direction`（同一张卡在 `ltr_ttb` 下归一为 2 并报 `LB-L005`，在 `ttb_ltr` 下归一为 0 不报） | LB-004 PR |
+| LB-004 排列层测试与本地检查 | `PYTHON=/tmp/lb-venv/bin/python bash scripts/check.sh` → `compileall` 通过、`259 passed, 2 skipped in 93.55s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.x；跳过的 2 项是只有装 OpenCV 才跑的两条交叉核对）；其中新增排列层 67 例：`tests/test_layout_protocol.py` 24、`tests/test_layout_arrange.py` 21、`tests/test_layout_fixtures.py` 13、`tests/test_layout_cli.py` 9（单独跑 `python -m pytest tests/test_layout_*.py` → `67 passed in 3.10s`） | LB-004 PR |
+| LB-004 CI 对 PR 显示检查结果 | PR #13 的 `ci` 工作流（run 45193979675）两个矩阵任务均通过：`check (python 3.11)` pass（1m24s，`259 passed, 2 skipped in 66.15s`，解释器 Python 3.11.18）、`check (python 3.13)` pass（1m45s，`259 passed, 2 skipped in 92.43s`，解释器 Python 3.13.18），各自执行 `bash scripts/check.sh` 并以「==> 检查通过」结束；跳过的 2 项与 LB-002/LB-003 相同，是只有装 OpenCV 才跑的交叉核对 | LB-004 PR #13 |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物，以及 **LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计；仍未包含**排列、解析、执行、界面**（LB-004 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，以及 **LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照；仍未包含**解析、执行、界面**（LB-005 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器与识别模块，没有排列及其后面的任何模块）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块与排列层，没有解析及其后面的任何模块）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-004 | 排列还原（→ Layout） | 计划中（可直接消费 LB-003 的 `CardCandidateList`） |
-| LB-005 | 语法解析（→ AST） | 计划中 |
+| LB-005 | 语法解析（→ AST） | 计划中（可直接消费 LB-004 的 `Layout`） |
 | LB-006 | 规范化 IR | 计划中 |
 | LB-007 | 模拟执行器 | 计划中 |
 | LB-008 | 调试界面（分层可视化） | 计划中 |
@@ -77,16 +86,25 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有排列、解析、执行、界面**：仓库已有骨架、LB-002 合成卡片生成器与 LB-003 识别模块（含 6 个场景 fixtures 的识别统计），但**没有排列、解析、执行、界面**，因此任何「能执行」「能显示」的说法目前都不成立。
+- **还没有解析、执行、界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块与 LB-004 排列层（含 6 个场景 fixtures 的识别统计与 4 个候选夹具的排列验收），但**没有解析、执行、界面**，因此任何「能执行」「能显示」的说法目前都不成立。
 - **LB-003 只在合成图上验证过**：所有识别结论都来自 LB-002 的合成灰度图（无镜头畸变、无运动模糊）。真实摄像头的鲁棒性（反光、阴影、透视更大、运动模糊）没有证据，属 LB-010/LB-020。
 - **LB-003 已知的识别偏差（如实计入统计，不隐藏）**：
   1. `overlap` 场景 3 张卡只识别出 1 张：标记 12 完全漏检（标记被纸片/卡片盖住），标记 6 检出形状但码字不可译码（报 `occluded` 候选）；
   2. 卡片级遮挡在识别层看不到：`overlap` 里 C02 的标记完好，因此报 `ok` 而真值是 `occluded`（区分「卡片被压住」需要 LB-004 的分簇信息或额外的卡面外观校验）；
   3. 位姿只在标记可见边长 ≥ 24 px 时输出，且没有非线性精化：真实相机上只能当粗值（LB-010 负责标定与精化）；
   4. 只支持 1 模块宽黑边的 4×4 字典；标记可见边长小于约 8 px 会漏检；不做多尺度检测。
+- **LB-004 已知限制（详见 `docs/DECISIONS.md` D-015）**：
+  1. 排列阈值需要长度尺度，而 §4/§3.2 只给了 `center_px`：本实现用「各候选到最近邻距离的中位数」当典型卡距（自适应），
+     因此**只有两张卡、或两行贴得比卡距还近时无法判歧义**，这类场景需用 `--pitch-px` 显式给预期卡距；
+  2. 行分簇是一维间隙聚类，**不做透视矫正**：桌面倾斜导致同一行的 y 跨度超过约一个卡距时会被切成两行（此时会报 `LB-L004` 提示，而不是静默出错）；
+  3. `ttb_ltr` 下「一行」在画面上是一列，是本实现对 §4 的解释；若解析层（LB-005）按「横排才叫行」实现需要先对齐；
+  4. 朝向归一依赖注册象限，而 LB-003 当前所有卡的象限都是 0（注册信息），「卡片实体转 90°」尚未在实测中出现；
+  5. `fixtures/layouts` 里的 `spacing-ambiguity.json` / `duplicates.json` 是**手写**夹具（§3.4 的唯一例外，原因见 `fixtures/README.md` §4），
+     LB-002 的场景预设不产生这两种候选形态。
 - **LB-003 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-014 —— §3 没有 `diagnostics` 槽位、`status` 无法表达多事实冲突、`orientation_quadrant` 没有「未知」表示、§0 的 `schema_version`（`major.minor`）与示例（`0.0.1`）不一致、§0 的「逆时针为正」与相机坐标系 y 向下冲突、§3.2 缺 `card_id`、§3.1 的 `pose` 未定义必填性与精度。
 - **LB-002 已知局限**（详见 `docs/DECISIONS.md` D-012）：只出 8bit 灰度图；相机是针孔 + 无畸变（畸变留给 LB-010）；遮挡物只支持凸四边形；卡片数、字典与版式是临时假设（Q1 未定，临时固定 `DICT_4X4_50` + 16 张卡）。
 - **LB-002 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（LB-002 的条目仍按原样描述，实现落在 `src/liveblocks/synth/`）。
+- **LB-004 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/layout/`，LB-005 起的条目原样保留）。
 - **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
 - **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。

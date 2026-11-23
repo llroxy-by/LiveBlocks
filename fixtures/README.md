@@ -59,7 +59,33 @@ python -m liveblocks synth verify --dir fixtures/scenes
 `status` 取值与 `docs/PROTOCOL.md` §3.2 的 `CardCandidateList.status` 对齐：
 `ok` | `clipped` | `occluded`（`unknown_card` / `ambiguous` 属于识别层结论，生成器不会产出）。
 
-## 3. 约定
+## 4. `layouts/`（LB-004 卡片候选夹具）
+
+排列层（LB-004）的输入是协议 §3.2 的 `CardCandidateList`，因此夹具不是图像而是**候选列表 JSON**。
+四个文件覆盖 Issue #11 的验收点：
+
+| 夹具 | 覆盖 | 来源 |
+| --- | --- | --- |
+| `multi-row-cards.json` | 两行样例被正确分成两行（6 张卡 → 2 行 × 3 槽位） | **真跑出来的**：`liveblocks recognize detect --image fixtures/scenes/multi-row.png --card-layout card-40x40` 的输出原样入库 |
+| `overlap-cards.json` | 身份未知的候选被排列层排除并留痕（`LB-L003`） | 同上，`fixtures/scenes/overlap.png` 的识别输出（含 1 个 `occluded` 候选） |
+| `spacing-ambiguity.json` | 行内间距过小 → `LB-L001` | **手写**：单排 4 张卡，其中一张与前一张只差 38 px（典型卡距 79 px） |
+| `duplicates.json` | 重复候选去重 → `LB-L002` | **手写**：同一张卡（`C01`）被检出两次，圆心相距 3.6 px，置信度 0.92 / 0.61 |
+
+- 两个「真跑」夹具是**上游行为的快照**：`tests/test_layout_fixtures.py::test_recognition_snapshots_match_fresh_recognition`
+  会用当前识别代码重跑并逐字段比对，识别变了会立刻失败；要更新就重跑上面的命令覆盖文件。
+- 两个手写夹具是 §3.4「夹具只由 `liveblocks synth` 生成」的**唯一例外**：需要复现的是「识别层可能
+  吐出的歧义/重复候选」，而 LB-002 的场景预设不产生这两种形态（`overlap` 场景虽然卡间距小，但识别
+  只给出 1 个可用候选）。它们都是 §3.2 的合法文档，`tests/test_layout_fixtures.py` 会先用
+  `validate_card_candidate_list` 校验，再断言诊断码与槽位。
+- 校验命令：
+
+  ```bash
+  # 跑全部候选夹具，打印行/槽位/诊断与验收对照（退出码 0 = 四条验收全过）
+  liveblocks layout report --dir fixtures/layouts
+  ```
+
+## 5. 约定
+
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。
 2. 每个夹具都要能追溯到生成它的脚本与提交（在 PR/Issue 中说明）。

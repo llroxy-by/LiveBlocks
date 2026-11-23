@@ -57,6 +57,28 @@ def _require(document: dict[str, Any], key: str, kind: str) -> Any:
     return document[key]
 
 
+def validate_diagnostics(entries: Any) -> None:
+    """校验 §9 的诊断数组形状（``code`` / ``severity`` / ``message``，可选 ``candidate_ids``）。
+
+    S2 与 S3 的校验都复用这一份；``diagnostics`` 是 LB-003 起的**加法式**扩展（§10 规则 1），
+    协议 §4 的示例里已经出现 ``diagnostics``，但没定义它的校验口径。
+    """
+    if not isinstance(entries, list):
+        raise ValueError("diagnostics 必须是数组")
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("diagnostics 的每一项必须是对象")
+        for key in ("code", "severity", "message"):
+            if key not in entry:
+                raise ValueError(f"诊断对象缺少字段 {key!r}")
+        if entry["severity"] not in SEVERITIES:
+            raise ValueError(f"诊断 severity 非法：{entry['severity']!r}")
+        if "candidate_ids" in entry:
+            ids = entry["candidate_ids"]
+            if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+                raise ValueError("诊断的 candidate_ids 必须是字符串数组")
+
+
 def _check_common(document: dict[str, Any], kind: str) -> None:
     if document.get("kind") != kind:
         raise ValueError(f"kind 必须是 {kind!r}，实际 {document.get('kind')!r}")
@@ -67,17 +89,7 @@ def _check_common(document: dict[str, Any], kind: str) -> None:
         raise ValueError(f"schema_version 必须是 'major.minor[.patch]' 字符串，实际 {version!r}")
     if not isinstance(document.get("frame_id"), str):
         raise ValueError("frame_id 必须是字符串")
-    diagnostics = document.get("diagnostics", [])
-    if not isinstance(diagnostics, list):
-        raise ValueError("diagnostics 必须是数组")
-    for entry in diagnostics:
-        if not isinstance(entry, dict):
-            raise ValueError("diagnostics 的每一项必须是对象")
-        for key in ("code", "severity", "message"):
-            if key not in entry:
-                raise ValueError(f"诊断对象缺少字段 {key!r}")
-        if entry["severity"] not in SEVERITIES:
-            raise ValueError(f"诊断 severity 非法：{entry['severity']!r}")
+    validate_diagnostics(document.get("diagnostics", []))
 
 
 def _check_point(value: Any, name: str) -> None:

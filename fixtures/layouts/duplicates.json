@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "CardCandidateList",
+  "frame_id": "f-duplicates",
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "marker_ids": ["0"],
+      "card_id": "C01",
+      "card_type": "action",
+      "card_face": "move-forward",
+      "orientation_quadrant": 0,
+      "center_px": [150, 200],
+      "confidence": 0.92,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-1",
+      "marker_ids": ["0"],
+      "card_id": "C01",
+      "card_type": "action",
+      "card_face": "move-forward",
+      "orientation_quadrant": 0,
+      "center_px": [153, 202],
+      "confidence": 0.61,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-2",
+      "marker_ids": ["11"],
+      "card_id": "N01",
+      "card_type": "number",
+      "card_face": "number-1",
+      "orientation_quadrant": 0,
+      "center_px": [280, 200],
+      "confidence": 0.95,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-3",
+      "marker_ids": ["4"],
+      "card_id": "C05",
+      "card_type": "action",
+      "card_face": "jump",
+      "orientation_quadrant": 0,
+      "center_px": [410, 200],
+      "confidence": 0.90,
+      "status": "ok"
+    }
+  ],
+  "diagnostics": []
+}
