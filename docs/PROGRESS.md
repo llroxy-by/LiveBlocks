@@ -20,6 +20,7 @@
 | LB-001 一条命令跑全量测试且用例数 ≥1 | `python -m pytest` → `collected 6 items`、`6 passed in 0.13s`，退出码 0 | 同上 |
 | LB-001 断言失败时该命令非零退出 | 把 `tests/test_smoke.py::test_version_is_semver` 的断言临时改为 `assert liveblocks.__version__ == "9.9.9"`：`bash scripts/check.sh` → `1 failed, 5 passed`、退出码 **1**；`python -m pytest` 同样退出码 **1**；随后 `git checkout -- tests/test_smoke.py` 还原（`git status` 干净） | 同上 |
 | LB-001 本地检查脚本与 CI 是同一套检查 | `bash scripts/check.sh` → `==> 解释器`、`compileall`、`pytest (6 passed)`、`==> 检查通过`，退出码 0；`.github/workflows/ci.yml` 直接调用同一脚本 | 同上 |
+| LB-001 CI 对 PR 显示检查结果 | PR #5 的 `ci` 工作流（run 45161217507）两个矩阵任务均通过：`check (python 3.11)` success（21s）、`check (python 3.13)` success（14s），各自执行 `bash scripts/check.sh` | LB-001 PR #5 |
 | LB-001 命令行入口可用 | `liveblocks --version` → `liveblocks 0.0.1`（退出码 0）；`python -m liveblocks --version` 由 `tests/test_smoke.py` 用子进程覆盖 | 同上 |
 
 **说明**：以上「已验证」覆盖**文档层面**的可核对事实与 **LB-001 骨架层面**的可复现命令输出；**不含任何业务功能**（卡片生成、识别、解析、执行、界面）。
