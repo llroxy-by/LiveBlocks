@@ -1,0 +1,188 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "SyntheticCardScene",
+  "scene_id": "clipped",
+  "description": "裁切：一张卡左侧越出画面左边界（只见右侧约 3/4），另一张卡下边界被画面底边切断。",
+  "seed": 20261123,
+  "generator": {
+    "name": "liveblocks.synth",
+    "package_version": "0.0.1",
+    "layout_version": "0.0.1",
+    "card_dictionary_version": "0.0.1",
+    "aruco_dictionary": "DICT_4X4_50"
+  },
+  "image": {
+    "file": "clipped.png",
+    "mode": "L",
+    "width": 640,
+    "height": 480,
+    "pixel_sha256": "64ec770e048394299918ac2d5b4d5aaca9f56a74505ea273e2d44355523753f7"
+  },
+  "camera": {
+    "fx": 700.0,
+    "fy": 700.0,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "card_layout": "card-60x40",
+  "reading_direction": "ltr_ttb",
+  "background_shade": 60,
+  "lighting": {
+    "gain": 1.0,
+    "noise_sigma": 1.8,
+    "vignette": 0.1,
+    "blur_radius_px": 0
+  },
+  "jitter": {
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "z_mm": 0.0,
+    "yaw_deg": 0.0,
+    "pitch_deg": 0.0,
+    "roll_deg": 0.0
+  },
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "card_id": "C04",
+      "card_face": "turn-right",
+      "card_type": "action",
+      "marker_id": 3,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 0,
+      "pose": {
+        "x_mm": -122.0,
+        "y_mm": -20.0,
+        "z_mm": 300.0,
+        "yaw_deg": 1.0,
+        "pitch_deg": 0.0,
+        "roll_deg": 0.0
+      },
+      "center_px": [
+        35.333,
+        193.333
+      ],
+      "corners_px": [
+        [
+          -33.842,
+          145.452
+        ],
+        [
+          106.137,
+          147.895
+        ],
+        [
+          104.508,
+          241.215
+        ],
+        [
+          -35.47,
+          238.771
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          8.01,
+          154.351
+        ],
+        [
+          64.001,
+          155.328
+        ],
+        [
+          63.024,
+          211.319
+        ],
+        [
+          7.032,
+          210.342
+        ]
+      ],
+      "in_plane_angle_deg": 1.0,
+      "status": "clipped",
+      "visible_fraction": 0.75,
+      "out_of_frame_fraction": 0.25,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": true,
+      "clipped_corners": 2,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 9826
+    },
+    {
+      "candidate_id": "c-1",
+      "card_id": "N03",
+      "card_face": "number-3",
+      "card_type": "number",
+      "marker_id": 13,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 1,
+      "pose": {
+        "x_mm": 60.0,
+        "y_mm": 95.0,
+        "z_mm": 300.0,
+        "yaw_deg": -2.0,
+        "pitch_deg": 0.0,
+        "roll_deg": 1.0
+      },
+      "center_px": [
+        460.0,
+        461.667
+      ],
+      "corners_px": [
+        [
+          388.305,
+          417.162
+        ],
+        [
+          528.682,
+          412.888
+        ],
+        [
+          531.945,
+          506.327
+        ],
+        [
+          391.557,
+          510.276
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          430.6,
+          424.039
+        ],
+        [
+          486.751,
+          422.34
+        ],
+        [
+          488.707,
+          478.345
+        ],
+        [
+          432.553,
+          479.966
+        ]
+      ],
+      "in_plane_angle_deg": -1.744,
+      "status": "clipped",
+      "visible_fraction": 0.6875,
+      "out_of_frame_fraction": 0.3125,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": true,
+      "clipped_corners": 2,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 9116
+    }
+  ],
+  "occluders": [],
+  "diagnostics": []
+}

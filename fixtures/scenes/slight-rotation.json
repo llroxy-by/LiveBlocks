@@ -1,0 +1,258 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "SyntheticCardScene",
+  "scene_id": "slight-rotation",
+  "description": "轻微旋转：一排三卡，各卡绕垂直于桌面的轴旋转约 ±5°，并带少量俯仰。",
+  "seed": 20261123,
+  "generator": {
+    "name": "liveblocks.synth",
+    "package_version": "0.0.1",
+    "layout_version": "0.0.1",
+    "card_dictionary_version": "0.0.1",
+    "aruco_dictionary": "DICT_4X4_50"
+  },
+  "image": {
+    "file": "slight-rotation.png",
+    "mode": "L",
+    "width": 640,
+    "height": 480,
+    "pixel_sha256": "f3500a751a7a71149c230c77543e8a405dcf30811078e64a8e61ff6484e4075b"
+  },
+  "camera": {
+    "fx": 700.0,
+    "fy": 700.0,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "card_layout": "card-60x40",
+  "reading_direction": "ltr_ttb",
+  "background_shade": 62,
+  "lighting": {
+    "gain": 0.95,
+    "noise_sigma": 2.0,
+    "vignette": 0.12,
+    "blur_radius_px": 0
+  },
+  "jitter": {
+    "x_mm": 0.8,
+    "y_mm": 0.8,
+    "z_mm": 4.0,
+    "yaw_deg": 0.8,
+    "pitch_deg": 0.4,
+    "roll_deg": 0.3
+  },
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "card_id": "C03",
+      "card_face": "turn-left",
+      "card_type": "action",
+      "marker_id": 2,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 0,
+      "pose": {
+        "x_mm": -65.592,
+        "y_mm": 0.636,
+        "z_mm": 471.24,
+        "yaw_deg": -5.544,
+        "pitch_deg": 2.25,
+        "roll_deg": 0.753
+      },
+      "center_px": [
+        222.566,
+        240.945
+      ],
+      "corners_px": [
+        [
+          175.225,
+          215.66
+        ],
+        [
+          263.911,
+          207.033
+        ],
+        [
+          269.829,
+          266.188
+        ],
+        [
+          181.428,
+          274.687
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          202.337,
+          218.259
+        ],
+        [
+          237.801,
+          214.812
+        ],
+        [
+          241.406,
+          250.309
+        ],
+        [
+          206.01,
+          253.725
+        ]
+      ],
+      "in_plane_angle_deg": -5.556,
+      "status": "ok",
+      "visible_fraction": 1.0,
+      "out_of_frame_fraction": 0.0,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": false,
+      "clipped_corners": 0,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 5270
+    },
+    {
+      "candidate_id": "c-1",
+      "card_id": "N01",
+      "card_face": "number-1",
+      "card_type": "number",
+      "marker_id": 11,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 1,
+      "pose": {
+        "x_mm": 0.565,
+        "y_mm": -0.178,
+        "z_mm": 467.487,
+        "yaw_deg": 4.247,
+        "pitch_deg": -1.841,
+        "roll_deg": -1.045
+      },
+      "center_px": [
+        320.846,
+        239.733
+      ],
+      "corners_px": [
+        [
+          278.283,
+          206.538
+        ],
+        [
+          367.73,
+          213.304
+        ],
+        [
+          363.426,
+          272.942
+        ],
+        [
+          273.723,
+          266.297
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          304.77,
+          213.784
+        ],
+        [
+          340.557,
+          216.486
+        ],
+        [
+          337.931,
+          252.268
+        ],
+        [
+          302.082,
+          249.595
+        ]
+      ],
+      "in_plane_angle_deg": 4.326,
+      "status": "ok",
+      "visible_fraction": 1.0,
+      "out_of_frame_fraction": 0.0,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": false,
+      "clipped_corners": 0,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 5365
+    },
+    {
+      "candidate_id": "c-2",
+      "card_id": "C06",
+      "card_face": "pick",
+      "card_type": "action",
+      "marker_id": 5,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 2,
+      "pose": {
+        "x_mm": 65.635,
+        "y_mm": -0.623,
+        "z_mm": 472.431,
+        "yaw_deg": 5.651,
+        "pitch_deg": 2.473,
+        "roll_deg": 0.396
+      },
+      "center_px": [
+        417.251,
+        239.077
+      ],
+      "corners_px": [
+        [
+          376.011,
+          205.176
+        ],
+        [
+          464.727,
+          213.946
+        ],
+        [
+          458.376,
+          272.884
+        ],
+        [
+          369.99,
+          264.095
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          402.072,
+          212.979
+        ],
+        [
+          437.547,
+          216.487
+        ],
+        [
+          433.793,
+          251.876
+        ],
+        [
+          398.397,
+          248.362
+        ]
+      ],
+      "in_plane_angle_deg": 5.645,
+      "status": "ok",
+      "visible_fraction": 1.0,
+      "out_of_frame_fraction": 0.0,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": false,
+      "clipped_corners": 0,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 5260
+    }
+  ],
+  "occluders": [],
+  "diagnostics": []
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "SyntheticCardScene",
+  "scene_id": "normal",
+  "description": "正常：单卡正对相机、无遮挡、光照均匀。",
+  "seed": 20261123,
+  "generator": {
+    "name": "liveblocks.synth",
+    "package_version": "0.0.1",
+    "layout_version": "0.0.1",
+    "card_dictionary_version": "0.0.1",
+    "aruco_dictionary": "DICT_4X4_50"
+  },
+  "image": {
+    "file": "normal.png",
+    "mode": "L",
+    "width": 640,
+    "height": 480,
+    "pixel_sha256": "bb8552e2391c8d391ac5e44b9d5b93fa8a9f463b4aaadbb3a336074604e0227c"
+  },
+  "camera": {
+    "fx": 700.0,
+    "fy": 700.0,
+    "cx": 320.0,
+    "cy": 240.0
+  },
+  "card_layout": "card-60x40",
+  "reading_direction": "ltr_ttb",
+  "background_shade": 58,
+  "lighting": {
+    "gain": 1.0,
+    "noise_sigma": 1.5,
+    "vignette": 0.08,
+    "blur_radius_px": 0
+  },
+  "jitter": {
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "z_mm": 0.0,
+    "yaw_deg": 0.0,
+    "pitch_deg": 0.0,
+    "roll_deg": 0.0
+  },
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "card_id": "C01",
+      "card_face": "move-forward",
+      "card_type": "action",
+      "marker_id": 0,
+      "aruco_dictionary": "DICT_4X4_50",
+      "card_layout": "card-60x40",
+      "z_order": 0,
+      "draw_index": 0,
+      "pose": {
+        "x_mm": 0.0,
+        "y_mm": 0.0,
+        "z_mm": 300.0,
+        "yaw_deg": 0.0,
+        "pitch_deg": 0.0,
+        "roll_deg": 0.0
+      },
+      "center_px": [
+        320.0,
+        240.0
+      ],
+      "corners_px": [
+        [
+          250.0,
+          193.333
+        ],
+        [
+          390.0,
+          193.333
+        ],
+        [
+          390.0,
+          286.667
+        ],
+        [
+          250.0,
+          286.667
+        ]
+      ],
+      "marker_corners_px": [
+        [
+          292.0,
+          201.5
+        ],
+        [
+          348.0,
+          201.5
+        ],
+        [
+          348.0,
+          257.5
+        ],
+        [
+          292.0,
+          257.5
+        ]
+      ],
+      "in_plane_angle_deg": 0.0,
+      "status": "ok",
+      "visible_fraction": 1.0,
+      "out_of_frame_fraction": 0.0,
+      "occluded_fraction": 0.0,
+      "covered_by_cards_fraction": 0.0,
+      "clipped": false,
+      "clipped_corners": 0,
+      "occluded_by": [],
+      "covered_by_cards": [],
+      "drawn_pixels": 13120
+    }
+  ],
+  "occluders": [],
+  "diagnostics": []
+}
