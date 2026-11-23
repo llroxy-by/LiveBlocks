@@ -19,11 +19,10 @@ jobs:
     steps:
       - name: Wait for the orchestrator poll window
         run: sleep 100
-      - name: Comment to wake the agent
+      - name: Comment the full work order
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           NUMBER="${{ github.event.issue.number || inputs.issue_number }}"
-          gh issue comment "$NUMBER" \
-            --repo "${{ github.repository }}" \
-            --body "@llroxy-bot 请按本 Issue 的「范围」与「验收」执行，完成后开 PR 到 main，不要合并。"
+          gh issue view "$NUMBER" --repo "${{ github.repository }}" --json title,body --jq "\"@llroxy-bot 请执行以下工单，完成后开 PR 到 main，不要合并。\n\n# \" + .title + \"\n\n\" + .body" > /tmp/comment.md
+          gh issue comment "$NUMBER" --repo "${{ github.repository }}" --body-file /tmp/comment.md
