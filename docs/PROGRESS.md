@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-23（LB-001 工程骨架与测试框架，PR 见本仓库 `agent/lb-skeleton-tests-*` 分支）
+> 最近更新：2026-11-23（LB-002 合成卡片图像生成器，PR 见本仓库 `agent/lb-card-generator-*` 分支）
 
 ## 1. 已验证
 
@@ -22,16 +22,21 @@
 | LB-001 本地检查脚本与 CI 是同一套检查 | `bash scripts/check.sh` → `==> 解释器`、`compileall`、`pytest (6 passed)`、`==> 检查通过`，退出码 0；`.github/workflows/ci.yml` 直接调用同一脚本 | 同上 |
 | LB-001 CI 对 PR 显示检查结果 | PR #5 的 `ci` 工作流（run 45161217507）两个矩阵任务均通过：`check (python 3.11)` success（21s）、`check (python 3.13)` success（14s），各自执行 `bash scripts/check.sh` | LB-001 PR #5 |
 | LB-001 命令行入口可用 | `liveblocks --version` → `liveblocks 0.0.1`（退出码 0）；`python -m liveblocks --version` 由 `tests/test_smoke.py` 用子进程覆盖 | 同上 |
+| LB-002 合成卡片生成器：按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切），每张图附真值 JSON | 实现见 `src/liveblocks/synth/`（模块：`dictionaries.py` / `geometry.py` / `texture.py` / `raster.py` / `png.py` / `spec.py` / `generator.py`），数据见 `src/liveblocks/data/`（`card_dictionary.json`、`aruco_dictionaries.json`、`synth_layouts.json`、`bitmap_font.json`）；`python -m liveblocks synth list` 列出 16 张卡、2 种卡面版式、6 个场景预设 | LB-002 PR |
+| LB-002 固定随机种子 → 生成结果字节可复现 | `python -m liveblocks synth verify --dir fixtures/scenes` → 6 行全部 `OK … 字节=同 像素=同 真值=同`，末行 `6/6 个场景与入库 fixtures 完全一致`，退出码 0；`tests/test_synth_reproducibility.py` 覆盖「同种子两次 → PNG 字节 / 像素 / 真值文本全等」「换种子 → 像素与真值均变化」，并逐个比对入库 `*.png` 字节与 `*.json` 文本 | 同上 |
+| LB-002 每张图附真值（卡片 id、角点、位姿） | `fixtures/scenes/*.json` 每张卡含 `card_id` / `marker_id` / `card_face` / `pose{x,y,z_mm,yaw,pitch,roll_deg}` / `corners_px` / `marker_corners_px` / `in_plane_angle_deg` / `visible_fraction` / `status` / `occluded_by` / `covered_by_cards`；`tests/test_synth_generator.py` 断言字段齐全、角点按左上→右上→右下→左下且为凸四边形、面内角与 `yaw` 相差 < 2° | 同上 |
+| LB-002 五类样例作为 fixtures 入库 | `fixtures/scenes/`：`normal`、`slight-rotation`、`overlap`、`clipped`、`low-light`、`multi-row`（共 6 场景 / 6 张 640×480 灰度 PNG + 6 份真值 + `index.json`，约 0.95 MB）；`tests/test_synth_reproducibility.py::test_required_fixture_files_exist` 按类别断言文件与真值字段 | 同上 |
+| LB-002 生成器与可复现性测试 | `PYTHON=./.venv/bin/python bash scripts/check.sh` → `collected 82 items`、`82 passed in 74.37s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2；含 LB-001 的 6 条骨架用例） | 同上 |
+| LB-002 入库 ArUco 位表与 OpenCV `DICT_4X4_50` 逐位一致 | 可选 extra：`python -m pip install -e '.[dev,aruco]'` 后 `python -m pytest tests/test_synth_dictionary.py` → `8 passed`，其中 `test_vendored_bit_patterns_match_opencv` 用 OpenCV 逐位核对 50 个码字；CI 只装 `.[dev]`，该用例自动 skip | 同上 |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实与 **LB-001 骨架层面**的可复现命令输出；**不含任何业务功能**（卡片生成、识别、解析、执行、界面）。
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出，以及 **LB-002 合成卡片生成器**的可复现产物；仍未包含**识别、排列、解析、执行、界面**（LB-003 起）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中尚无业务代码）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 与 LB-002 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有合成卡片生成器，没有识别及其后面的任何模块）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-002 | 合成卡片图像生成器（虚拟卡片） | 计划中 |
 | LB-003 | 识别模块（ArUco 候选 → 卡片候选） | 计划中 |
 | LB-004 | 排列还原（→ Layout） | 计划中 |
 | LB-005 | 语法解析（→ AST） | 计划中 |
@@ -60,7 +65,9 @@
 
 ## 4. 已知限制与阻塞
 
-- **只有骨架，没有业务能力**：仓库已有工程骨架、6 条骨架用例与 CI，但**没有任何业务模块**，因此任何「能识别」「能执行」的说法目前都不成立。
+- **只有合成卡片生成器，没有识别能力**：仓库已有工程骨架与 LB-002 的合成卡片生成器（含 6 个场景 fixtures），但**没有识别、排列、解析、执行、界面**，因此任何「能识别」「能执行」的说法目前都不成立。
+- **LB-002 已知局限**（详见 `docs/DECISIONS.md` D-012）：只出 8bit 灰度图；相机是针孔 + 无畸变（畸变留给 LB-010）；遮挡物只支持凸四边形；卡片数、字典与版式是临时假设（Q1 未定，临时固定 `DICT_4X4_50` + 16 张卡）。
+- **LB-002 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（LB-002 的条目仍按原样描述，实现落在 `src/liveblocks/synth/`）。
 - **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
 - **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。
