@@ -27,6 +27,7 @@
 | LB-002 每张图附真值（卡片 id、角点、位姿） | `fixtures/scenes/*.json` 每张卡含 `card_id` / `marker_id` / `card_face` / `pose{x,y,z_mm,yaw,pitch,roll_deg}` / `corners_px` / `marker_corners_px` / `in_plane_angle_deg` / `visible_fraction` / `status` / `occluded_by` / `covered_by_cards`；`tests/test_synth_generator.py` 断言字段齐全、角点按左上→右上→右下→左下且为凸四边形、面内角与 `yaw` 相差 < 2° | 同上 |
 | LB-002 五类样例作为 fixtures 入库 | `fixtures/scenes/`：`normal`、`slight-rotation`、`overlap`、`clipped`、`low-light`、`multi-row`（共 6 场景 / 6 张 640×480 灰度 PNG + 6 份真值 + `index.json`，约 0.95 MB）；`tests/test_synth_reproducibility.py::test_required_fixture_files_exist` 按类别断言文件与真值字段 | 同上 |
 | LB-002 生成器与可复现性测试 | `PYTHON=./.venv/bin/python bash scripts/check.sh` → `collected 82 items`、`82 passed in 74.37s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2；含 LB-001 的 6 条骨架用例） | 同上 |
+| LB-002 CI 对 PR 显示检查结果 | PR #8 的 `ci` 工作流（run 45168889185）两个矩阵任务均通过：`check (python 3.11)` success（1m21s，`81 passed, 1 skipped in 65.77s`）、`check (python 3.13)` success（1m16s，`81 passed, 1 skipped in 61.78s`），各自执行 `bash scripts/check.sh`；skipped 的那条是 `test_vendored_bit_patterns_match_opencv`（CI 只装 `.[dev]`，没有 OpenCV） | LB-002 PR #8 |
 | LB-002 入库 ArUco 位表与 OpenCV `DICT_4X4_50` 逐位一致 | 可选 extra：`python -m pip install -e '.[dev,aruco]'` 后 `python -m pytest tests/test_synth_dictionary.py` → `8 passed`，其中 `test_vendored_bit_patterns_match_opencv` 用 OpenCV 逐位核对 50 个码字；CI 只装 `.[dev]`，该用例自动 skip | 同上 |
 
 **说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出，以及 **LB-002 合成卡片生成器**的可复现产物；仍未包含**识别、排列、解析、执行、界面**（LB-003 起）。
