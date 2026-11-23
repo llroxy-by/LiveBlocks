@@ -5,27 +5,31 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-23（基线文档，PR 见本仓库 `agent/liveblocks-baseline-docs-*` 分支）
+> 最近更新：2026-11-23（LB-001 工程骨架与测试框架，PR 见本仓库 `agent/lb-skeleton-tests-*` 分支）
 
 ## 1. 已验证
 
 | 项 | 证据 | 版本 |
 | --- | --- | --- |
-| 基线文档存在且结构完整（README、AGENTS、docs 六篇、Issue 模板） | 交付 PR 中的「文档自检」记录：文件清单核对、Markdown 链接目标存在、代码围栏成对、`PROTOCOL.md` 内示例 JSON 全部可被 `python3 -m json.tool` 解析 | 本 PR |
-| `docs/PROTOCOL.md` 标注为草案并带 `schema_version` 约定 | 文档首段状态块 + §0/§10 | 本 PR |
-| `docs/HARDWARE.md` 中电源与引脚项均为待确认 | §2 / §3 表格中 `PW-*`、`PN-*` 全部标注待确认，无实测结论 | 本 PR |
-| `docs/ROADMAP.md` 的 Backlog 按依赖排序且每条可独立开 Issue | §1 依赖图 + §2/§3/§4 条目均含范围/依赖/可观察验收/不做 | 本 PR |
-| 变更范围仅限工单约定路径 | PR 的 `git diff --name-only` 清单 | 本 PR |
+| 基线文档存在且结构完整（README、AGENTS、docs 六篇、Issue 模板） | 交付 PR 中的「文档自检」记录：文件清单核对、Markdown 链接目标存在、代码围栏成对、`PROTOCOL.md` 内示例 JSON 全部可被 `python3 -m json.tool` 解析 | 基线 PR |
+| `docs/PROTOCOL.md` 标注为草案并带 `schema_version` 约定 | 文档首段状态块 + §0/§10 | 基线 PR |
+| `docs/HARDWARE.md` 中电源与引脚项均为待确认 | §2 / §3 表格中 `PW-*`、`PN-*` 全部标注待确认，无实测结论 | 基线 PR |
+| `docs/ROADMAP.md` 的 Backlog 按依赖排序且每条可独立开 Issue | §1 依赖图 + §2/§3/§4 条目均含范围/依赖/可观察验收/不做 | 基线 PR |
+| 变更范围仅限工单约定路径 | PR 的 `git diff --name-only` 清单 | 基线 PR |
+| LB-001 工程骨架目录与依赖声明：`src/liveblocks/`、`tests/`、`fixtures/`、`scripts/`、`pyproject.toml`、`.github/workflows/ci.yml` | 在干净克隆（`git clone --branch agent/lb-skeleton-tests-*`）中按 README「快速开始」原样执行：`python3 -m venv .venv` → `source .venv/bin/activate` → `python -m pip install --upgrade pip` → `python -m pip install -e '.[dev]'`，全部退出码 0 | LB-001 PR（Python 3.14.4 / pytest 9.2.0） |
+| LB-001 一条命令跑全量测试且用例数 ≥1 | `python -m pytest` → `collected 6 items`、`6 passed in 0.13s`，退出码 0 | 同上 |
+| LB-001 断言失败时该命令非零退出 | 把 `tests/test_smoke.py::test_version_is_semver` 的断言临时改为 `assert liveblocks.__version__ == "9.9.9"`：`bash scripts/check.sh` → `1 failed, 5 passed`、退出码 **1**；`python -m pytest` 同样退出码 **1**；随后 `git checkout -- tests/test_smoke.py` 还原（`git status` 干净） | 同上 |
+| LB-001 本地检查脚本与 CI 是同一套检查 | `bash scripts/check.sh` → `==> 解释器`、`compileall`、`pytest (6 passed)`、`==> 检查通过`，退出码 0；`.github/workflows/ci.yml` 直接调用同一脚本 | 同上 |
+| LB-001 命令行入口可用 | `liveblocks --version` → `liveblocks 0.0.1`（退出码 0）；`python -m liveblocks --version` 由 `tests/test_smoke.py` 用子进程覆盖 | 同上 |
 
-**说明**：以上「已验证」只覆盖**文档层面**的可核对事实，不代表任何功能已实现。
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实与 **LB-001 骨架层面**的可复现命令输出；**不含任何业务功能**（卡片生成、识别、解析、执行、界面）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目，均未开始（仓库中尚无代码、测试与 CI）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中尚无业务代码）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-001 | 仓库工程骨架与测试框架 | 计划中（依赖 D-004 确认语言） |
 | LB-002 | 合成卡片图像生成器（虚拟卡片） | 计划中 |
 | LB-003 | 识别模块（ArUco 候选 → 卡片候选） | 计划中 |
 | LB-004 | 排列还原（→ Layout） | 计划中 |
@@ -55,8 +59,8 @@
 
 ## 4. 已知限制与阻塞
 
-- **无代码、无测试、无 CI**：任何「能跑」「能识别」的说法目前都不成立。
-- **D-004 未定**：实现语言待仓库所有者确认，LB-001 的具体脚本命令因此未写死。
+- **只有骨架，没有业务能力**：仓库已有工程骨架、6 条骨架用例与 CI，但**没有任何业务模块**，因此任何「能识别」「能执行」的说法目前都不成立。
+- **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
 - **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。
 - **本单不派发后续工单**：ROADMAP 条目只是 backlog，开新 Issue 需仓库所有者确认（`AGENTS.md` §5）。
