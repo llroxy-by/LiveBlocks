@@ -3,19 +3,27 @@ name: dispatch-agent
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to dispatch
+        required: true
 
 permissions:
   issues: write
 
 jobs:
   dispatch:
-    if: github.event.issue.user.login == 'llroxy-bot'
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.user.login == 'llroxy-bot'
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for the orchestrator poll window
+        run: sleep 100
       - name: Comment to wake the agent
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue comment "${{ github.event.issue.number }}" \
+          NUMBER="${{ github.event.issue.number || inputs.issue_number }}"
+          gh issue comment "$NUMBER" \
             --repo "${{ github.repository }}" \
             --body "@llroxy-bot 请按本 Issue 的「范围」与「验收」执行，完成后开 PR 到 main，不要合并。"
