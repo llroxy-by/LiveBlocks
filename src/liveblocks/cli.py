@@ -7,6 +7,12 @@
   - ``liveblocks recognize detect --image <png>``   输出符合 `docs/PROTOCOL.md` §3 的 JSON
   - ``liveblocks recognize report``                 对 fixtures 目录跑识别并打印准确率/漏检统计
 
+- LB-004：``layout`` 子命令组：
+
+  - ``liveblocks layout arrange --candidates <json>``  卡片候选 → 符合 §4 的 ``Layout``
+  - ``liveblocks layout from-image --image <png>``     一步「识别 → 排列」（调试用）
+  - ``liveblocks layout report``                       对 ``fixtures/layouts`` 跑排列并打印验收对照
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -24,6 +30,8 @@ PROG = "liveblocks"
 #: fixtures 的默认随机种子（改它会让入库 fixtures 全部失效，需同时重新生成）。
 DEFAULT_SEED = 20261123
 DEFAULT_SCENE_DIR = Path("fixtures/scenes")
+#: LB-004 的候选夹具目录（``CardCandidateList`` JSON，见 ``fixtures/README.md`` §4）。
+DEFAULT_LAYOUT_DIR = Path("fixtures/layouts")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -123,6 +131,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report.set_defaults(handler=_cmd_recognize_report)
 
+    layout = subparsers.add_parser(
+        "layout",
+        help="排列层（LB-004）：卡片候选 → Layout",
+        description="把 §3.2 的 CardCandidateList 还原成协议 §4 的 Layout（分簇/排序/朝向归一/去重/歧义诊断）。",
+    )
+    layout_sub = layout.add_subparsers(dest="layout_command", required=True)
+
+    arrange = layout_sub.add_parser(
+        "arrange", help="对一份 CardCandidateList JSON 做排列，输出 Layout JSON"
+    )
+    arrange.add_argument(
+        "--candidates", type=Path, required=True, help="输入 CardCandidateList JSON（协议 §3.2）"
+    )
+    _add_layout_arguments(arrange)
+    arrange.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    arrange.set_defaults(handler=_cmd_layout_arrange)
+
+    from_image = layout_sub.add_parser(
+        "from-image", help="先识别一张图片，再直接排列成 Layout（调试用的一步到位）"
+    )
+    from_image.add_argument("--image", type=Path, required=True, help="输入 PNG（8bit 灰度）")
+    from_image.add_argument("--frame-id", default=None, help="帧标识（默认由文件名推导 f-<主干>）")
+    from_image.add_argument(
+        "--card-layout",
+        default=None,
+        help="采集用的卡面版式（默认取 synth_layouts.json 的 default_card_layout）",
+    )
+    from_image.add_argument("--source", default="synthetic", help="帧来源（synthetic|camera|replay）")
+    _add_layout_arguments(from_image)
+    from_image.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    from_image.set_defaults(handler=_cmd_layout_from_image)
+
+    layout_report = layout_sub.add_parser(
+        "report", help="对候选夹具目录跑排列并打印行/槽位/诊断与验收对照"
+    )
+    layout_report.add_argument(
+        "--dir", type=Path, default=DEFAULT_LAYOUT_DIR, help="候选夹具目录（默认 fixtures/layouts）"
+    )
+    _add_layout_arguments(layout_report)
+    layout_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    layout_report.set_defaults(handler=_cmd_layout_report)
+
     return parser
 
 
@@ -142,6 +192,57 @@ def _resolve_scenes(requested: str) -> list[str]:
             f"未知场景预设：{', '.join(unknown)}；可用：{', '.join(available)}"
         )
     return names
+
+
+def _add_layout_arguments(parser: argparse.ArgumentParser) -> None:
+    """``layout`` 子命令共用的排列参数（比例阈值都相对「典型卡距」，见 D-015）。"""
+    parser.add_argument(
+        "--reading-direction",
+        choices=("ltr_ttb", "rtl_ttb", "ttb_ltr"),
+        default="ltr_ttb",
+        help="阅读方向（默认 ltr_ttb：左上→右下）",
+    )
+    parser.add_argument(
+        "--pitch-px",
+        type=float,
+        default=None,
+        help="显式指定典型卡距（像素）；默认由候选集自适应估计",
+    )
+    parser.add_argument(
+        "--duplicate-gap-ratio",
+        type=float,
+        default=None,
+        help="重复判定阈值 / 卡距（默认 0.35）",
+    )
+    parser.add_argument(
+        "--row-gap-ratio",
+        type=float,
+        default=None,
+        help="行切分阈值 / 卡距（默认 0.75）",
+    )
+    parser.add_argument(
+        "--slot-gap-ratio",
+        type=float,
+        default=None,
+        help="行内间距歧义阈值 / 卡距（默认 0.6）",
+    )
+
+
+def _layout_options(args: argparse.Namespace):
+    from .layout import LayoutOptions
+
+    defaults = LayoutOptions()
+    return LayoutOptions(
+        reading_direction=args.reading_direction,
+        pitch_px=args.pitch_px,
+        duplicate_gap_ratio=(
+            defaults.duplicate_gap_ratio
+            if args.duplicate_gap_ratio is None
+            else args.duplicate_gap_ratio
+        ),
+        row_gap_ratio=defaults.row_gap_ratio if args.row_gap_ratio is None else args.row_gap_ratio,
+        slot_gap_ratio=defaults.slot_gap_ratio if args.slot_gap_ratio is None else args.slot_gap_ratio,
+    )
 
 
 def _cmd_synth_generate(args: argparse.Namespace) -> int:
@@ -286,6 +387,77 @@ def _cmd_recognize_report(args: argparse.Namespace) -> int:
         )
         print(f"统计已写入 {args.json}")
     return 0
+
+
+def _cmd_layout_arrange(args: argparse.Namespace) -> int:
+    import json
+
+    from .layout import layout_from_document
+
+    if not args.candidates.is_file():
+        raise SystemExit(f"找不到候选文件：{args.candidates}")
+    document = json.loads(args.candidates.read_text(encoding="utf-8"))
+    if document.get("kind") != "CardCandidateList":
+        raise SystemExit(
+            f"{args.candidates} 的 kind 是 {document.get('kind')!r}，这里需要 CardCandidateList（协议 §3.2）"
+        )
+    layout = layout_from_document(document, options=_layout_options(args))
+    text = json.dumps(layout.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    if args.out is None:
+        print(text, end="")
+        return 0
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(text, encoding="utf-8")
+    print(
+        f"写入 {args.out}（Layout，行 {len(layout.rows)}，槽位 {len(layout.slots)}，"
+        f"诊断 {len(layout.diagnostics)} 条，frame_id={layout.frame_id}）"
+    )
+    return 0
+
+
+def _cmd_layout_from_image(args: argparse.Namespace) -> int:
+    import json
+
+    from .layout import layout_from_card_list
+    from .vision import recognize_path
+
+    if not args.image.is_file():
+        raise SystemExit(f"找不到图像：{args.image}")
+    registry = _build_registry(args.card_layout, None)
+    result = recognize_path(
+        args.image, registry=registry, frame_id=args.frame_id, source=args.source
+    )
+    layout = layout_from_card_list(result.cards, options=_layout_options(args))
+    text = json.dumps(layout.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    if args.out is None:
+        print(text, end="")
+        return 0
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(text, encoding="utf-8")
+    print(
+        f"写入 {args.out}（Layout，候选 {len(result.cards.cards)} → 行 {len(layout.rows)} / "
+        f"槽位 {len(layout.slots)}，诊断 {len(layout.diagnostics)} 条）"
+    )
+    return 0
+
+
+def _cmd_layout_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .layout import build_report
+
+    report = build_report(args.dir, options=_layout_options(args))
+    if not report.fixtures:
+        print(f"{args.dir} 里没有 CardCandidateList 夹具")
+        return 1
+    print(report.format(), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:

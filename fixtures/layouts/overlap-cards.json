@@ -1,0 +1,46 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "CardCandidateList",
+  "frame_id": "f-overlap",
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "marker_ids": [],
+      "card_id": "unknown",
+      "card_type": "unknown",
+      "card_face": "unknown",
+      "center_px": [
+        385,
+        234
+      ],
+      "confidence": 0.5,
+      "status": "occluded"
+    },
+    {
+      "candidate_id": "c-1",
+      "marker_ids": [
+        "1"
+      ],
+      "card_id": "C02",
+      "card_type": "action",
+      "card_face": "move-back",
+      "orientation_quadrant": 0,
+      "center_px": [
+        248,
+        240
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "LB-V003",
+      "severity": "warning",
+      "message": "候选 m-0：黑边不完整（最佳距离 2 位）",
+      "candidate_ids": [
+        "m-0"
+      ]
+    }
+  ]
+}

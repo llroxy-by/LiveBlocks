@@ -1,0 +1,104 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "CardCandidateList",
+  "frame_id": "f-multi-row",
+  "cards": [
+    {
+      "candidate_id": "c-0",
+      "marker_ids": [
+        "4"
+      ],
+      "card_id": "C05",
+      "card_type": "action",
+      "card_face": "jump",
+      "orientation_quadrant": 0,
+      "center_px": [
+        383,
+        200
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-1",
+      "marker_ids": [
+        "11"
+      ],
+      "card_id": "N01",
+      "card_type": "number",
+      "card_face": "number-1",
+      "orientation_quadrant": 0,
+      "center_px": [
+        322,
+        201
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-2",
+      "marker_ids": [
+        "0"
+      ],
+      "card_id": "C01",
+      "card_type": "action",
+      "card_face": "move-forward",
+      "orientation_quadrant": 0,
+      "center_px": [
+        257,
+        206
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-3",
+      "marker_ids": [
+        "9"
+      ],
+      "card_id": "C10",
+      "card_type": "control",
+      "card_face": "end",
+      "orientation_quadrant": 0,
+      "center_px": [
+        384,
+        271
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-4",
+      "marker_ids": [
+        "7"
+      ],
+      "card_id": "C08",
+      "card_type": "control",
+      "card_face": "repeat",
+      "orientation_quadrant": 0,
+      "center_px": [
+        257,
+        275
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    },
+    {
+      "candidate_id": "c-5",
+      "marker_ids": [
+        "12"
+      ],
+      "card_id": "N02",
+      "card_type": "number",
+      "card_face": "number-2",
+      "orientation_quadrant": 0,
+      "center_px": [
+        318,
+        275
+      ],
+      "confidence": 1.0,
+      "status": "ok"
+    }
+  ],
+  "diagnostics": []
+}
