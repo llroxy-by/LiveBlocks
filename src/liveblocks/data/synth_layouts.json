@@ -1,0 +1,155 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "SynthLayouts",
+  "layout_version": "0.0.1",
+  "note": "版式定义：card_layouts 决定单张卡片怎么画（尺寸、留白、标记位置、标签），scene_presets 决定场景怎么摆（相机内参、每张卡的位姿、遮挡物、光照与抖动）。坐标系：卡面毫米坐标原点在卡片左上角、x 向右 y 向下；场景毫米坐标原点在光轴上、x 向右 y 向下、z_mm 为卡片中心到相机的深度。",
+  "default_card_layout": "card-60x40",
+  "card_layouts": {
+    "card-60x40": {
+      "description": "60 x 40 mm 横版卡，24 mm 标记居中偏上，下方留出打印标签的位置。",
+      "image_width_mm": 60.0,
+      "image_height_mm": 40.0,
+      "pixels_per_mm": 10,
+      "corner_radius_mm": 2.5,
+      "border_mm": 1.2,
+      "border_shade": 26,
+      "background_shade": 244,
+      "marker_size_mm": 24.0,
+      "marker_center_mm": [30.0, 15.5],
+      "marker_quiet_zone_mm": 2.5,
+      "label_anchor_mm": [4.0, 30.0],
+      "label_max_height_mm": 5.0,
+      "label_shade": 18,
+      "label_max_width_mm": 52.0
+    },
+    "card-40x40": {
+      "description": "40 x 40 mm 方卡，16 mm 标记居中，用于小间距 / 多卡场景。",
+      "image_width_mm": 40.0,
+      "image_height_mm": 40.0,
+      "pixels_per_mm": 10,
+      "corner_radius_mm": 2.0,
+      "border_mm": 1.0,
+      "border_shade": 30,
+      "background_shade": 241,
+      "marker_size_mm": 16.0,
+      "marker_center_mm": [20.0, 17.0],
+      "marker_quiet_zone_mm": 2.0,
+      "label_anchor_mm": [3.0, 28.5],
+      "label_max_height_mm": 4.5,
+      "label_shade": 20,
+      "label_max_width_mm": 34.0
+    }
+  },
+  "scene_presets": {
+    "normal": {
+      "description": "正常：单卡正对相机、无遮挡、光照均匀。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 58,
+      "card_layout": "card-60x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C01", "x_mm": 0.0, "y_mm": 0.0, "z_mm": 300.0, "yaw_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0, "z_order": 0 }
+      ],
+      "occluders": [],
+      "lighting": { "gain": 1.0, "noise_sigma": 1.5, "vignette": 0.08, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0, "yaw_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0 }
+    },
+    "slight-rotation": {
+      "description": "轻微旋转：一排三卡，各卡绕垂直于桌面的轴旋转约 ±5°，并带少量俯仰。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 62,
+      "card_layout": "card-60x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C03", "x_mm": -66.0, "y_mm": 0.0, "z_mm": 470.0, "yaw_deg": -5.0, "pitch_deg": 2.0, "roll_deg": 1.0, "z_order": 0 },
+        { "card_id": "N01", "x_mm": 0.0, "y_mm": 0.0, "z_mm": 470.0, "yaw_deg": 4.0, "pitch_deg": -1.5, "roll_deg": -1.0, "z_order": 0 },
+        { "card_id": "C06", "x_mm": 66.0, "y_mm": 0.0, "z_mm": 470.0, "yaw_deg": 6.0, "pitch_deg": 2.5, "roll_deg": 0.5, "z_order": 0 }
+      ],
+      "occluders": [],
+      "lighting": { "gain": 0.95, "noise_sigma": 2.0, "vignette": 0.12, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 0.8, "y_mm": 0.8, "z_mm": 4.0, "yaw_deg": 0.8, "pitch_deg": 0.4, "roll_deg": 0.3 }
+    },
+    "overlap": {
+      "description": "重叠：三卡横向间距小于卡片宽度（互相压盖），另有一张纸片状遮挡物压住中间卡片右半部分。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 54,
+      "card_layout": "card-60x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C02", "x_mm": -44.0, "y_mm": 0.0, "z_mm": 430.0, "yaw_deg": -2.0, "pitch_deg": 0.0, "roll_deg": 1.5, "z_order": 0 },
+        { "card_id": "N02", "x_mm": 0.0, "y_mm": 0.0, "z_mm": 430.0, "yaw_deg": 1.0, "pitch_deg": 0.0, "roll_deg": -1.0, "z_order": 0 },
+        { "card_id": "C07", "x_mm": 44.0, "y_mm": 0.0, "z_mm": 430.0, "yaw_deg": 3.0, "pitch_deg": 0.0, "roll_deg": 0.5, "z_order": 1 }
+      ],
+      "occluders": [
+        {
+          "occluder_id": "o-0",
+          "kind": "quad",
+          "shade": 96,
+          "z_order": 10,
+          "z_mm": 430.0,
+          "corners_mm": [[-2.0, -22.0], [34.0, -16.0], [30.0, 14.0], [-6.0, 10.0]]
+        }
+      ],
+      "lighting": { "gain": 0.92, "noise_sigma": 2.5, "vignette": 0.15, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0, "yaw_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0 }
+    },
+    "clipped": {
+      "description": "裁切：一张卡左侧越出画面左边界（只见右侧约 3/4），另一张卡下边界被画面底边切断。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 60,
+      "card_layout": "card-60x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C04", "x_mm": -122.0, "y_mm": -20.0, "z_mm": 300.0, "yaw_deg": 1.0, "pitch_deg": 0.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "N03", "x_mm": 60.0, "y_mm": 95.0, "z_mm": 300.0, "yaw_deg": -2.0, "pitch_deg": 0.0, "roll_deg": 1.0, "z_order": 0 }
+      ],
+      "occluders": [],
+      "lighting": { "gain": 1.0, "noise_sigma": 1.8, "vignette": 0.10, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0, "yaw_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0 }
+    },
+    "low-light": {
+      "description": "低光照：整体偏暗、对比度低、噪声明显并带较强暗角。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 30,
+      "card_layout": "card-60x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C09", "x_mm": -34.0, "y_mm": 2.0, "z_mm": 340.0, "yaw_deg": -3.0, "pitch_deg": 0.0, "roll_deg": -1.0, "z_order": 0 },
+        { "card_id": "N05", "x_mm": 34.0, "y_mm": -2.0, "z_mm": 340.0, "yaw_deg": 3.0, "pitch_deg": 0.0, "roll_deg": 1.0, "z_order": 0 }
+      ],
+      "occluders": [],
+      "lighting": { "gain": 0.32, "noise_sigma": 9.0, "vignette": 0.42, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0, "yaw_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0 }
+    },
+    "multi-row": {
+      "description": "多卡多行：2 行 x 3 列共 6 张方卡，带俯仰透视与种子驱动的位姿抖动（任意角度/间距）。",
+      "width": 640,
+      "height": 480,
+      "background_shade": 64,
+      "card_layout": "card-40x40",
+      "camera": { "fx": 700.0, "fy": 700.0, "cx": 320.0, "cy": 240.0 },
+      "reading_direction": "ltr_ttb",
+      "placements": [
+        { "card_id": "C01", "x_mm": -52.0, "y_mm": -30.0, "z_mm": 560.0, "yaw_deg": 0.0, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "N01", "x_mm": 0.0, "y_mm": -30.0, "z_mm": 560.0, "yaw_deg": 1.0, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "C05", "x_mm": 52.0, "y_mm": -30.0, "z_mm": 560.0, "yaw_deg": -1.0, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "C08", "x_mm": -52.0, "y_mm": 26.0, "z_mm": 560.0, "yaw_deg": 2.0, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "N02", "x_mm": 0.0, "y_mm": 26.0, "z_mm": 560.0, "yaw_deg": -2.0, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 },
+        { "card_id": "C10", "x_mm": 52.0, "y_mm": 26.0, "z_mm": 560.0, "yaw_deg": 0.5, "pitch_deg": 7.0, "roll_deg": 0.0, "z_order": 0 }
+      ],
+      "occluders": [],
+      "lighting": { "gain": 0.98, "noise_sigma": 2.2, "vignette": 0.14, "blur_radius_px": 0 },
+      "jitter": { "x_mm": 3.0, "y_mm": 3.0, "z_mm": 10.0, "yaw_deg": 2.0, "pitch_deg": 1.0, "roll_deg": 1.0 }
+    }
+  }
+}

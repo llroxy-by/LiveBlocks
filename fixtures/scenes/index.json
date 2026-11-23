@@ -1,0 +1,65 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "SyntheticSceneIndex",
+  "seed": 20261123,
+  "generator": {
+    "name": "liveblocks.synth",
+    "package_version": "0.0.1"
+  },
+  "scenes": [
+    {
+      "scene_id": "clipped",
+      "image": "clipped.png",
+      "ground_truth": "clipped.json",
+      "width": 640,
+      "height": 480,
+      "cards": 2,
+      "pixel_sha256": "64ec770e048394299918ac2d5b4d5aaca9f56a74505ea273e2d44355523753f7"
+    },
+    {
+      "scene_id": "low-light",
+      "image": "low-light.png",
+      "ground_truth": "low-light.json",
+      "width": 640,
+      "height": 480,
+      "cards": 2,
+      "pixel_sha256": "2db3c38f00a54e424cd72c7767bcb7de367f9dad6b692c8eb41bbf7968167e7e"
+    },
+    {
+      "scene_id": "multi-row",
+      "image": "multi-row.png",
+      "ground_truth": "multi-row.json",
+      "width": 640,
+      "height": 480,
+      "cards": 6,
+      "pixel_sha256": "99dc5752c0b802dad4d66be6ab0cdf10f6d8cffe12af0b211dff0137c21bc3d8"
+    },
+    {
+      "scene_id": "normal",
+      "image": "normal.png",
+      "ground_truth": "normal.json",
+      "width": 640,
+      "height": 480,
+      "cards": 1,
+      "pixel_sha256": "bb8552e2391c8d391ac5e44b9d5b93fa8a9f463b4aaadbb3a336074604e0227c"
+    },
+    {
+      "scene_id": "overlap",
+      "image": "overlap.png",
+      "ground_truth": "overlap.json",
+      "width": 640,
+      "height": 480,
+      "cards": 3,
+      "pixel_sha256": "7f83822d220cc25787a8f70a0155345dd4501465fffa0b6f6aa446ddbfb14324"
+    },
+    {
+      "scene_id": "slight-rotation",
+      "image": "slight-rotation.png",
+      "ground_truth": "slight-rotation.json",
+      "width": 640,
+      "height": 480,
+      "cards": 3,
+      "pixel_sha256": "f3500a751a7a71149c230c77543e8a405dcf30811078e64a8e61ff6484e4075b"
+    }
+  ]
+}

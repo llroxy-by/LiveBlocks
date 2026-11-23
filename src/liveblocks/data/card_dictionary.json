@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "CardDictionary",
+  "dictionary_version": "0.0.1",
+  "aruco_dictionary": "DICT_4X4_50",
+  "note": "卡片字典：一张卡 = 一个 ArUco 标记 + 卡面语义。marker_id 必须落在 aruco_dictionary 的编号范围内且全局唯一；card_id 是链路里所有下游层引用卡片身份的键（见 docs/PROTOCOL.md）。本表是最小可用集合，扩大卡片数量只改本文件。",
+  "cards": [
+    { "card_id": "C01", "marker_id": 0, "card_type": "action", "card_face": "move-forward", "label": "前进" },
+    { "card_id": "C02", "marker_id": 1, "card_type": "action", "card_face": "move-back", "label": "后退" },
+    { "card_id": "C03", "marker_id": 2, "card_type": "action", "card_face": "turn-left", "label": "左转" },
+    { "card_id": "C04", "marker_id": 3, "card_type": "action", "card_face": "turn-right", "label": "右转" },
+    { "card_id": "C05", "marker_id": 4, "card_type": "action", "card_face": "jump", "label": "跳跃" },
+    { "card_id": "C06", "marker_id": 5, "card_type": "action", "card_face": "pick", "label": "拾取" },
+    { "card_id": "C07", "marker_id": 6, "card_type": "action", "card_face": "drop", "label": "放置" },
+    { "card_id": "C08", "marker_id": 7, "card_type": "control", "card_face": "repeat", "label": "重复" },
+    { "card_id": "C09", "marker_id": 8, "card_type": "control", "card_face": "if", "label": "条件" },
+    { "card_id": "C10", "marker_id": 9, "card_type": "control", "card_face": "end", "label": "结束" },
+    { "card_id": "C11", "marker_id": 10, "card_type": "control", "card_face": "wait", "label": "等待" },
+    { "card_id": "N01", "marker_id": 11, "card_type": "number", "card_face": "number-1", "label": "数字 1" },
+    { "card_id": "N02", "marker_id": 12, "card_type": "number", "card_face": "number-2", "label": "数字 2" },
+    { "card_id": "N03", "marker_id": 13, "card_type": "number", "card_face": "number-3", "label": "数字 3" },
+    { "card_id": "N05", "marker_id": 14, "card_type": "number", "card_face": "number-5", "label": "数字 5" },
+    { "card_id": "O01", "marker_id": 15, "card_type": "operator", "card_face": "operator-add", "label": "加" }
+  ]
+}
