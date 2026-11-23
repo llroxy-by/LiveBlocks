@@ -4,12 +4,45 @@
 
 ## 现状
 
-- 仓库目前处于**研发基线（baseline）阶段**，只有文档，没有任何可运行代码。
+- 仓库处于**软件 MVP 骨架阶段**：已具备工程骨架、依赖声明、测试与 CI，但**还没有任何业务模块**（卡片生成、识别、解析、执行、界面均为后续任务）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
-- 尚无 CI、构建脚本与测试，这些随软件 MVP 骨架任务引入。
+- 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
 
 更细的状态与证据见 [docs/PROGRESS.md](docs/PROGRESS.md)。
+
+## 快速开始（工程骨架）
+
+在仓库根目录依次执行以下命令（需要 Python 3.11 或更高版本）：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[dev]'
+```
+
+跑全量测试（一条命令，输出用例数 ≥ 1）：
+
+```bash
+python -m pytest
+```
+
+跑本地检查（与 CI 同一套检查：语法编译检查 + 全量测试）：
+
+```bash
+bash scripts/check.sh
+```
+
+查看命令行入口（骨架阶段只有版本信息）：
+
+```bash
+liveblocks --version
+```
+
+预期：`python -m pytest` 与 `bash scripts/check.sh` 均以退出码 0 结束；让任一断言失败时，两者以非零码退出（这正是它们在 CI 中拦回归的方式）。
+
+CI：`.github/workflows/ci.yml` 在 PR 与 `main` 的 push 上对 Python 3.11 / 3.13 各跑一次 `bash scripts/check.sh`。无法使用 GitHub Actions 时，本地执行同一条命令即为等价检查。
 
 ## 文档入口
 
@@ -29,15 +62,24 @@
 - 首版人工测试与反馈入口就是现有 GitHub Issues，使用 `.github/ISSUE_TEMPLATE/hardware-test.md` 模板提交。
 - 协作细则见 [AGENTS.md](AGENTS.md)。
 
-## 目录约定（基线）
+## 目录约定（骨架）
 
 ```
 .
 ├── README.md
 ├── AGENTS.md
-├── docs/            # 架构、协议草案、硬件、路线图、决策、进度
-└── .github/
-    └── ISSUE_TEMPLATE/hardware-test.md
+├── pyproject.toml        # 依赖声明、包元数据、pytest 配置
+├── .github/
+│   ├── ISSUE_TEMPLATE/hardware-test.md
+│   └── workflows/ci.yml  # PR 上跑 bash scripts/check.sh
+├── src/liveblocks/       # 实现包（当前只有版本号与命令行入口，无业务模块）
+│   ├── __init__.py
+│   ├── __main__.py       # python -m liveblocks
+│   └── cli.py            # liveblocks --version
+├── tests/                # pytest 用例，testpaths = tests
+├── fixtures/             # 测试夹具（当前只有骨架自检用的占位 JSON）
+├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
+└── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```
 
-代码目录（如 `src/`、`tests/`、`fixtures/`）在软件 MVP 骨架任务中引入，届时同步更新本节。
+新增业务模块时应遵守：源码进 `src/liveblocks/`，用例进 `tests/`，夹具进 `fixtures/`，并且 `bash scripts/check.sh` 通过。

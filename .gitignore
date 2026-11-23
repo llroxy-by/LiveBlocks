@@ -1,0 +1,20 @@
+# 虚拟环境
+.venv/
+venv/
+
+# Python 产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# 测试产物
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
