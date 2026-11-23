@@ -1,0 +1,9 @@
+{
+  "fixture_version": "0.0.1",
+  "kind": "skeleton",
+  "note": "工程骨架自检用的占位 fixture。LB-002 起的业务 fixture（合成卡片图像与真值 JSON）也放在本目录。",
+  "expected": {
+    "package_importable": true,
+    "cli_supports_version_flag": true
+  }
+}
