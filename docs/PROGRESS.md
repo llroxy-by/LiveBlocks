@@ -5,10 +5,10 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-032 实体卡片规范草案与标记页模板生成器：`docs/CARD-SPEC.md` 给出卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的**草案**（每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」）；`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`cardsheet verify` 把页面渲染成图再识别，**16/16 张卡的 id 与朝向全部读出**、转 90°/180°/270° 后朝向跟着转、同参数两次渲染逐字节一致；`cardsheet stencil` 是没打印机时的手绘降级版。实体卡打印 / 基材 / 打印工艺 / 可识别距离 = **待人工验证**）
-> 上上轮：LB-031 标定算法与标定文件格式（LB-010 算法侧）：棋盘格 / ChArUco 两条流程、标定文件 JSON（内参 + `plumb_bob` 畸变 + 重投影误差 + 图像尺寸 + 标定图数量 + 时间戳）、`Frame.intrinsics/distortion` 的填充路径，以及合成器的**镜头畸变模型**（径向 + 切向）。`liveblocks calibrate report` 一条命令在**合成畸变场景**上打印重投影误差与校正前后角点重复性（均值 / 最大值，像素），退出码 0，标定文件与入库 golden 逐字节一致；真实摄像头的标定数字 = **待人工验证**）
-> 上上轮：LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
-> 上一轮：LB-009 端到端回归与运行记录（`liveblocks e2e run` / `e2e regression`）
+> 最近更新：2026-11-24（LB-033 硬件后端协议层与虚拟串口模拟设备（LB-013 协议侧）：串口帧格式（帧头 `4C 42` + 长度 + CRC-16/CCITT-FALSE + 序号 1..0xFFFF + 命令/事件类型）、`Transport` 抽象（`PtyTransport` / `SerialTransport` / `MemoryTransport`）、`LB-H0xx` 断连·超时·重连·坏帧·乱序·设备故障错误模型，以及一台用 pty 假装 ESP32-C3 SuperMini 的纯 Python **设备模拟器**；`backend:"hw"` 与 sim 同一份 §7.1 形状，8 种 IR 双后端逐事件一致（`tests/test_backend_parity.py`），拔线出明确断连错误事件且毫秒级结束、插回可重连继续跑。**全部证据来自 pty 上的模拟器，属模拟器证据，不是硬件证据**；真实串口与真机 = **待人工验证**（`docs/HW.md` §8））
+> 上一轮：LB-032 实体卡片规范草案与标记页模板生成器：`docs/CARD-SPEC.md` 给出卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的**草案**（每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」）；`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`cardsheet verify` 把页面渲染成图再识别，**16/16 张卡的 id 与朝向全部读出**、转 90°/180°/270° 后朝向跟着转、同参数两次渲染逐字节一致；`cardsheet stencil` 是没打印机时的手绘降级版。实体卡打印 / 基材 / 打印工艺 / 可识别距离 = **待人工验证**）
+> 上上上轮：LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
+> 上上上上轮：LB-009 端到端回归与运行记录（`liveblocks e2e run` / `e2e regression`）
 
 ## 1. 已验证
 
@@ -139,6 +139,15 @@
 | LB-032 手绘降级版（黑白格 + 编号，没打印机时用） | `python -m liveblocks cardsheet stencil --out stencil.txt` 给每张卡一张 8×8 字符网格（外圈 1 格静区、内圈 6×6 标记，`#` 涂黑 / `.` 不涂，每格 4 mm）；网格由位表直接生成，`parse_stencil_blocks()` 反解回 6×6 位串后 **16/16 张卡与 `aruco_dictionaries.json` 逐字符相同**（`tests/test_sheet_stencil.py` 9 例，含「抄错一个格 → 位串必变」的反证与拒绝残缺网格的用例） | LB-032 PR |
 
 | LB-032 全量检查（本地，等价 CI 环境：只装 `.[dev]`） | `PYTHONPATH=src PYTHON=python3 bash scripts/check.sh` → `compileall` 通过、**1351 passed, 2 skipped in 244.14s**、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2）；跳过的 2 项是只有装 OpenCV 才跑的交叉核对（`tests/test_vision_opencv.py`、`tests/test_synth_dictionary.py`）；其中本单新增 7 个测试文件共 **121 例**：`tests/test_sheet_docs.py` 40、`tests/test_sheet_spec.py` 23、`tests/test_sheet_render.py` 16、`tests/test_sheet_verify.py` 13、`tests/test_sheet_cli.py` 12、`tests/test_sheet_stencil.py` 9、`tests/test_sheet_pdf.py` 8 | LB-032 PR |
+| LB-033 串口帧格式（帧头 / 长度 / CRC / 序号 / 命令与事件类型）定稿为草案并有实现 | `docs/HW.md`（草案 `hw_protocol_version` 0.0.1）§2/§3/§4；实现 `src/liveblocks/hw/{frames,protocol}.py`。帧 = 帧头 9 B（`4C 42` + VER + KIND + TYPE + SEQ(2) + LEN(2)）+ JSON 载荷（≤512 B）+ CRC-16/CCITT-FALSE(2 B，poly `0x1021` / init `0xFFFF`，覆盖 VER..PAYLOAD）。`python -m liveblocks hw frames --hexdump` 打印帧格式、5 条命令 / 8 个事件与一帧 `PONG` 的十六进制，CRC 自检行 `crc16_ccitt(b"123456789") = 0x29B1`；`tests/test_hw_frames.py` 29 例覆盖线格式逐字段、载荷规范编码（键排序）、两帧拆包 | LB-033 PR |
+| LB-033 协议层单测覆盖「截断 / CRC 错 / 序号乱序」三类异常 | `tests/test_hw_frames.py`：截断 6 组切点全部报 `truncated`（`detail.have` 等于实到字节数）、逐字节喂入时最后一字节前不出帧且 `pending` 等于已收前缀；CRC 错翻一位报 `crc` 且丢帧后紧跟的好帧照收；序号跳号 / 重号 / 0 / 0xFFFF 全部报 `sequence`（带 `expected` / `actual` / `seen`），重连后 `reset()` 从 1 重新开始；另有坏 MAGIC 逐字节重同步（`skipped_bytes` 计数）、版本 / KIND / TYPE / 超长载荷被拒、载荷必须是 JSON 对象 | LB-033 PR |
+| LB-033 `backend:"hw"` 事件流与 sim 同形（§7.1），双后端逐事件一致 | `python -m liveblocks hw parity --ir fixtures/ir/golden/all-ops.json` → `parity run-all-ops：一致（事件 17 条，hw 帧 收 11 / 发 11）`，退出码 0。`tests/test_backend_parity.py` 21 例：8 种 IR（成功 / 两行最小程序 / 空程序 / 空手 `drop`（`LB-R005`）/ 边界超时 / 步数上限（`LB-R002`）/ 中断（`LB-R004`））逐条比 `seq` / `phase` / `step_id` / `at_ms` / `detail`（唯一例外是起步 `log` 的 `detail.backend`）与 `ExecResult` / `ExecState` 的关键状态，全部一致；两条**反向验证**：改一个 `state_delta` 必须报不一致、`frames_out=0`（设备没参与）必须报不一致 | LB-033 PR |
+| LB-033 hw 的每一帧命令都由 pty 设备模拟器应答（不是主机自演） | `executor` 把每步编码成 `STEP` 帧下发，`finish.detail.state_delta` 与 `ExecState.world` 都来自设备的 `STEP_OK`；`tests/test_hw_exec.py::test_device_state_is_the_source_of_the_finish_events` 断言运行结束时 `run.world == device.world()`、至少一条 `finish` 带非空 `state_delta`；`tests/test_hw_device.py` 10 例覆盖 HELLO / BEGIN / STEP / END / PING 分发、`STEP` 按 `step_id` 幂等（重发不重复作用）、空手 `drop` 回 `STEP_ERROR`（`LB-R005`）、未知命令回 `FAULT`（`LB-H006`）、心跳上行、拔线后状态保留、`PtyPort` 自动插回 | LB-033 PR |
+| LB-033 pty 模拟器被拔线时产生明确的断连错误事件且**不阻塞**、可重连 | `python -m liveblocks hw unplug-test --ir fixtures/ir/golden/all-ops.json --unplug-after-steps 2` → ① `runtime_error`，诊断 `['LB-H001']`，**实测 4.1 ms** 结束（不阻塞）；② 插回后 `ok`、步骤 8、重连 1 次、诊断 `['LB-H001']`，**实测 10.7 ms**；两条均「通过」，退出码 0。`tests/test_hw_exec.py` 断言断连路径 `< 2000 ms`、`LB-H001` 事件带 `detail.recovered`、重连后 `run.world == sim.world` 且存在 `LB-H003` 的 `log` 事件；`tests/test_hw_transport.py::test_pty_reports_disconnect_as_transport_closed` 断言拔线后读立刻抛 `TransportClosed`（reason `eio`/`eof`） | LB-033 PR |
+| LB-033 链路错误模型（`LB-H0xx`）六种情形各有码、各有测试 | 码表见 `docs/HW.md` §6（`LB-H001` 断连 / `LB-H002` 超时 / `LB-H003` 已恢复 / `LB-H004` 坏帧 / `LB-H005` 乱序 / `LB-H006` 设备故障）。`tests/test_hw_exec.py`：设备不回应（`latency 300 ms` vs `response_timeout 50 ms`）→ `LB-H002`；脚本化设备回坏 CRC → `LB-H004`（`detail.reason=crc`）；回错序号 → `LB-H005`（`detail.expected=3`）；回无关事件 → `LB-H006`；工厂抛异常（没插线）→ 单条 `error` 事件 + `LB-H001`（`detail.reason=open`） | LB-033 PR |
+| LB-033 golden 夹具（`fixtures/hw/`）逐字节可复现 | `tests/test_hw_fixtures.py` 13 例：5 个夹具（`all-ops` 17 事件 / `from-valid-basic` 5 / `drop-empty` 7（`LB-R005`）/ `timeout-exact` 3 / `non-terminating-steps` 22（`LB-R002`））真跑一遍，事件流 JSONL、`ExecResult`、`ExecState` 与入库 golden **逐字节一致**；`index.json` 的 `status` / `steps` / `events_count` / `codes` / `frames` 与实测一致；`fixtures/README.md` §13 说明生成命令与「模拟器证据」口径 | LB-033 PR |
+| LB-033 文档与实现的正反向核对（含「模拟器证据 ≠ 硬件证据」与待人工验证步骤） | `docs/HW.md`（草案 0.0.1）；`tests/test_hw_docs.py` 24 例：`hw_document_gaps` 对入库文档返回空；**反向验证**删掉一条命令行 / 一个事件行 / 一个 `LB-H0xx` 行、改错误码标题、改 MAGIC、改载荷上限、删「模拟器证据」/「待人工验证」/传输类名/`"hw"`/CRC 多项式之一，都必须报缺口；文档禁用「真机验证通过」这类说法；§8「待人工验证」必须含 HW-1..HW-4 与「怎么验 / 通过标准」；文档里的 `--ir` 路径与 `fixtures/hw/*` 路径必须真实存在 | LB-033 PR |
+| LB-033 全量检查（本地，等价 CI 环境：只装 `.[dev]`） | `PYTHON=/tmp/lb-hw-venv/bin/python bash scripts/check.sh`（rebase 到 main `6f2f61c`、含 LB-032 的测试）→ `compileall` 通过、**1488 passed, 3 skipped in 250.31s**、`==> 检查通过`，退出码 0（Python 3.14.4）；其中本单新增 7 个测试文件：`tests/test_hw_frames.py` 29、`tests/test_hw_transport.py` 14、`tests/test_hw_device.py` 10、`tests/test_hw_exec.py` 16、`tests/test_hw_cli.py` 11、`tests/test_hw_fixtures.py` 13、`tests/test_hw_docs.py` 24、`tests/test_backend_parity.py` 21（共 138 例）；3 个 skip 是需要 OpenCV / jsonschema 的可选交叉核对，与本单无关 | LB-033 PR |
 
 ## 2. 计划中
 
@@ -146,6 +155,7 @@
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
+| LB-033（硬件侧） | 真实串口 / 真机接入与 ESP32-C3 上的联调（协议侧已完成，见 §1；硬件侧属 LB-020） | 计划中（待硬件到位与人工实测） |
 | LB-021 | 交付与打包 | 计划中（依赖 LB-020） |
 
 尚未决的 Q1–Q10 见 `docs/ARCHITECTURE.md` §4 与 `docs/DECISIONS.md` 末表；它们只影响「怎么做」，不改变上述计划项的存在。
@@ -166,6 +176,7 @@
 | **LB-030 验收④（待人工验证）** | 在**手机上**打开采集台、选**后置摄像头**、对着一张**实体卡片**能看到叠加框与该卡的 `card_id`（可选再验「识别错了」归档）。代理没有手机/实体卡/相机，**不得代填**；人工步骤与通过标准见 `docs/CAPTURE.md` §6，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CAPTURE.md` §6、`docs/ROADMAP.md` LB-030 |
 | **LB-031 真实摄像头标定（待人工验证）** | 在**真实摄像头**上用打印的标定板采 15 张以上板图后跑 `liveblocks calibrate run`，得到该设备的真实重投影误差与内参。代理没有摄像头与实物板，**不得代填**；人工步骤与记录要求见 `docs/CALIB.md` §8，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交。同一节的「可用拍摄距离」与「板面平整度/打印尺寸误差」也都在此列表内 | `docs/CALIB.md` §8、`docs/ROADMAP.md` LB-031 |
 | **LB-032 实体卡片打印（待人工验证）** | 打印 A4 标记页后：① 卡面长边/短边与标称 60×40 mm 的实测偏差（100% 比例是否准）；② 标记 6×6 模块的边缘质量与 6 个模块总长（标称 24 mm）；③ 卡面声明静区 2.5 mm（< 静区规则 4 mm）在贴卡/贴深色物件时是否仍能读出 `marker_id`；④ 基材与打印工艺对翘曲、透印、反光的影响；⑤ 0.3 / 0.5 / 0.8 m 与 0°/15°/30° 下的检出率；⑥ 手剪沿裁切线的偏差。代理没有打印机、卡纸与相机，**不得代填**；人工步骤见 `docs/CARD-SPEC.md` §11（与 `sheet.spec.HUMAN_VERIFICATION` 逐条对应），结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CARD-SPEC.md` §11、`docs/ROADMAP.md` LB-032 |
+| **LB-033 真实串口与真机（待人工验证）** | `SerialTransport` 打开真实串口（8N1 / 115200）并按协议收发；真机拔 USB 断连出 `LB-H001` 且不阻塞、插回可重连；真机复位后世界状态是否保留；长线 / 干扰下的坏帧（`LB-H004`）与心跳周期。代理只有 pty 上的模拟器，**不得代填**；人工步骤与通过标准见 `docs/HW.md` §8 的 HW-1…HW-5 表，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/HW.md` §8、`docs/ROADMAP.md` LB-033 |
 | HW-8 真实闭环 | LB-010 / LB-011 / LB-012 / LB-013 / LB-020 的端到端联调与延迟 | `docs/ROADMAP.md` §3 |
 
 ## 4. 已知限制与阻塞
@@ -270,6 +281,24 @@
 - **LB-030 未改动 `docs/PROTOCOL.md` 与 `docs/ROADMAP.md`**：协议只报告缺口（`docs/CAPTURE.md` §9），
   ROADMAP 的范围与优先级一个字节都没改。对上游代码的唯一改动是 `vision/stats.py` 的 `SCENE_KINDS`
   （加法式：多认一个 `LiveCaptureScene`，合成场景行为不变）。
+- **LB-033 已知限制（详见 `docs/DECISIONS.md` D-024 与 `docs/HW.md` §9）**：
+  1. **全部证据是模拟器证据**：`backend:"hw"` 的每一次运行都由 pty 上的纯 Python 设备模拟器应答，
+     真实串口 / 真机 / 拔插 / 复位行为一律「待硬件验证」（§3）。不得把 `hw` 事件当成真机结论；
+  2. **`error` 事件在 hw 后端可以是「可恢复」的**：断连后重连成功会留一条 `LB-H001`
+     （`detail.recovered=true`）再继续跑，`ExecResult.status` 才是「是否真的结束」的判据。
+     §7.1 没有「可恢复错误」的位置，属协议缺口（等 §7 定稿）；
+  3. **`STEP` 幂等只记最后一条**：设备只记住最近一个 `step_id`；P0 的 IR 不会隔步重发同一 id，
+     但长重连序列需要窗口化才能真正安全（未做）；
+  4. **没有重传 / 流控 / 窗口**：一问一答，吞吐不是本阶段目标；载荷是 JSON（可读、跨语言逐字节可对齐），
+     比二进制大；
+  5. **只支持 ESP32-C3 SuperMini**（`board` 固定），其它板子未支持；心跳周期未定（待 LB-034 实测）；
+  6. **`BEGIN` 会清零设备侧世界状态**：没有跨运行持久化，也没有「复位后重放」机制；
+  7. **CLI 目前只走 pty**：`hw run` / `hw parity` / `hw unplug-test` 用设备模拟器；把
+     `SerialTransport` 接进 CLI 的入口要等 LB-034 的固件侧确定（`docs/HW.md` §8 HW-1）。
+- **LB-033 未改动 `docs/ROADMAP.md`**：范围与优先级一个字节都没改（实现落在 `src/liveblocks/hw/`）；
+  对 `docs/PROTOCOL.md` 的改动是加法式（§7.1 一句指路 + §9 增加 `LB-H0xx` 一行）；
+  对 LB-007 代码的改动是加法式（把四条终止判定的文案抽成 `runtime.sim` 的公共函数，
+  sim 输出逐字节不变，`fixtures/exec` 的 golden 比对通过）。
 - **本单不派发后续工单**：ROADMAP 条目只是 backlog，开新 Issue 需仓库所有者确认（`AGENTS.md` §5）。
 
 ## 5. 更新规则

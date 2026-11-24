@@ -48,6 +48,14 @@
     ``/api/captures`` 列样本，「这帧识别错了」的样本单独进 ``fixtures/live/refused/``）
   - ``liveblocks serve-cam page``    把自包含页面导出成单个 HTML（断网可打开，便于取证）
 
+- LB-033：``hw`` 子命令组（硬件后端协议层与 pty 设备模拟器，``backend: "hw"``）：
+
+  - ``liveblocks hw run --ir <json>``         ``Ir`` 经串口协议（pty 上的设备模拟器）执行，事件流
+    与 sim 同一份 §7.1 形状、``backend: "hw"``；**这是模拟器证据，不是硬件证据**
+  - ``liveblocks hw parity --ir <json>``      同一 IR 双后端跑一遍并逐事件比较（结构 + 关键状态）
+  - ``liveblocks hw unplug-test --ir <json>`` 拔线复现：断连错误事件不阻塞、可重连继续跑
+  - ``liveblocks hw frames``                  打印串口帧格式与命令 / 事件表（供 LB-034 固件复用）
+
 - LB-031：``calibrate`` 子命令组（标定算法与标定文件格式）：
 
   - ``liveblocks calibrate report``      一条命令复现全部验收数字：合成标定 → 重投影误差 →
@@ -516,6 +524,73 @@ def build_parser() -> argparse.ArgumentParser:
     )
     page_cmd.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
     page_cmd.set_defaults(handler=_cmd_serve_cam_page)
+
+    hw = subparsers.add_parser(
+        "hw",
+        help="硬件后端协议层（LB-033）：串口帧协议 + pty 设备模拟器，事件标 backend=hw",
+        description=(
+            "用硬件后端执行协议 §6 的 Ir：每一步编码成串口帧、经 pty 交给设备模拟器执行，"
+            "事件与 sim 同一份 §7.1 形状但标 backend=hw。★ 全部是模拟器证据，不是硬件证据；"
+            "真实串口与真机联调属 LB-020。"
+        ),
+    )
+    hw_sub = hw.add_subparsers(dest="hw_command", required=True)
+
+    hw_run = hw_sub.add_parser(
+        "run", help="执行一份 Ir JSON（走串口协议 + pty 设备模拟器），打印摘要 + 最终状态 JSON"
+    )
+    hw_run.add_argument("--ir", type=Path, required=True, help="输入 Ir JSON（协议 §6）")
+    hw_run.add_argument("--run-id", default=None, help="运行标识（默认 run-<文件名主干>）")
+    hw_run.add_argument("--events-out", type=Path, default=None, help="事件流写成 JSONL（一行一个事件）")
+    hw_run.add_argument("--result-out", type=Path, default=None, help="把 ExecResult 写成 JSON")
+    hw_run.add_argument("--state-out", type=Path, default=None, help="把 ExecState 写成 JSON；不给则打印")
+    hw_run.add_argument(
+        "--abort-at-step", type=int, default=None, help="执行到第 N 步之前中断（与 exec run 同口径）"
+    )
+    hw_run.add_argument("--abort-at-ms", type=float, default=None, help="虚拟时钟走到 N 毫秒后中断")
+    hw_run.add_argument(
+        "--reconnect-attempts",
+        type=int,
+        default=1,
+        help="断连后允许的重连次数（默认 1；0 = 断连即终止）",
+    )
+    hw_run.add_argument(
+        "--response-timeout-ms",
+        type=float,
+        default=1000.0,
+        help="等设备回应的超时（毫秒，默认 1000）",
+    )
+    hw_run.add_argument(
+        "--unplug-after-steps",
+        type=int,
+        default=None,
+        help="让设备执行完第 N 步后自己拔线（复现断连，配合 --reconnect-attempts 看重连）",
+    )
+    hw_run.add_argument("--device-latency-ms", type=float, default=0.0, help="设备模拟处理时延（毫秒）")
+    hw_run.set_defaults(handler=_cmd_hw_run)
+
+    hw_parity = hw_sub.add_parser("parity", help="同一 IR 分别用 sim 与 hw 跑，逐事件比较结构与关键状态")
+    hw_parity.add_argument("--ir", type=Path, required=True, help="输入 Ir JSON（协议 §6）")
+    hw_parity.add_argument("--run-id", default=None, help="运行标识（默认 run-<文件名主干>）")
+    hw_parity.add_argument("--abort-at-step", type=int, default=None, help="两侧一起按步数中断")
+    hw_parity.add_argument("--abort-at-ms", type=float, default=None, help="两侧一起按虚拟时间中断")
+    hw_parity.add_argument("--json", type=Path, default=None, help="把比较结论另存为 JSON")
+    hw_parity.set_defaults(handler=_cmd_hw_parity)
+
+    hw_unplug = hw_sub.add_parser(
+        "unplug-test", help="拔线复现：断连错误事件不阻塞、可重连（模拟器证据）"
+    )
+    hw_unplug.add_argument("--ir", type=Path, required=True, help="输入 Ir JSON（协议 §6）")
+    hw_unplug.add_argument(
+        "--unplug-after-steps", type=int, default=1, help="设备执行完第 N 步后拔线（默认 1）"
+    )
+    hw_unplug.add_argument("--response-timeout-ms", type=float, default=1000.0, help="等回应的超时（毫秒）")
+    hw_unplug.add_argument("--json", type=Path, default=None, help="把结论另存为 JSON")
+    hw_unplug.set_defaults(handler=_cmd_hw_unplug_test)
+
+    hw_frames = hw_sub.add_parser("frames", help="打印串口帧格式、CRC 参数与命令 / 事件表")
+    hw_frames.add_argument("--hexdump", action="store_true", help="额外打印一帧 HELLO 的十六进制形态")
+    hw_frames.set_defaults(handler=_cmd_hw_frames)
 
     calibrate = subparsers.add_parser(
         "calibrate",
@@ -1185,6 +1260,218 @@ def _cmd_exec_report(args: argparse.Namespace) -> int:
         )
         print(f"报告已写入 {args.json}")
     return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _load_ir(path: Path):
+    """读一份 ``Ir`` JSON 并校验（hw 子命令共用）。"""
+    import json
+
+    from .runtime.sim import ir_from_document
+
+    if not path.is_file():
+        raise SystemExit(f"找不到 Ir 文件：{path}")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"{path} 不是合法 JSON：{error}") from error
+    if not isinstance(document, dict) or document.get("kind") != "Ir":
+        kind = document.get("kind") if isinstance(document, dict) else type(document).__name__
+        raise SystemExit(f"{path} 的 kind 是 {kind!r}，这里需要 Ir（协议 §6）")
+    try:
+        return ir_from_document(document)
+    except ValueError as error:
+        raise SystemExit(f"{path} 不是合法的 Ir：{error}") from error
+
+
+def _hw_run_summary(run) -> str:
+    limits = run.state["limits"]
+    return (
+        f"运行 {run.run_id}：{run.status}（backend=hw（模拟器证据），步骤 "
+        f"{run.steps_executed}/{limits['max_steps']}，虚拟耗时 {run.duration_ms:g} ms / "
+        f"{limits['timeout_ms']} ms，事件 {len(run.events)} 条，串口帧 发 "
+        f"{run.link['frames_out']} / 收 {run.link['frames_in']}，实测 {run.wall_ms:.2f} ms）"
+    )
+
+
+def _cmd_hw_run(args: argparse.Namespace) -> int:
+    from .hw import validate_hw_run
+    from .hw.executor import run_ir_over_pty
+    from .runtime import canonical_text
+
+    ir = _load_ir(args.ir)
+    run_id = args.run_id or f"run-{args.ir.stem}"
+    run = run_ir_over_pty(
+        ir,
+        run_id=run_id,
+        should_abort=_exec_abort_hook(args),
+        response_timeout_s=max(0.001, args.response_timeout_ms / 1000.0),
+        reconnect_attempts=args.reconnect_attempts,
+        unplug_after_steps=args.unplug_after_steps,
+        latency_ms=args.device_latency_ms,
+    )
+    try:
+        validate_hw_run(run)
+    except ValueError as error:
+        raise SystemExit(f"hw 后端产出的文档不合法（这是实现缺陷，请报 Issue）：{error}") from error
+
+    if args.events_out is not None:
+        args.events_out.parent.mkdir(parents=True, exist_ok=True)
+        args.events_out.write_text(run.events_text(), encoding="utf-8")
+    if args.result_out is not None:
+        args.result_out.parent.mkdir(parents=True, exist_ok=True)
+        args.result_out.write_text(run.result_text(), encoding="utf-8")
+
+    print(_hw_run_summary(run))
+    for entry in run.result["diagnostics"]:
+        print(f"  {entry['code']} {entry['severity']}: {entry['message']}", file=sys.stderr)
+    if args.events_out is not None:
+        print(f"事件流已写入 {args.events_out}（JSONL，{len(run.events)} 行）")
+    if args.result_out is not None:
+        print(f"ExecResult 已写入 {args.result_out}")
+    if args.state_out is not None:
+        args.state_out.parent.mkdir(parents=True, exist_ok=True)
+        args.state_out.write_text(canonical_text(run.state), encoding="utf-8")
+        print(f"最终状态已写入 {args.state_out}")
+    else:
+        print("最终状态 JSON（ExecState）：")
+        print(canonical_text(run.state), end="")
+    return 0 if run.status == "ok" else 1
+
+
+def _cmd_hw_parity(args: argparse.Namespace) -> int:
+    import json
+
+    from .hw import compare_runs, run_ir_over_pty
+    from .runtime import SimExecutor
+
+    ir = _load_ir(args.ir)
+    run_id = args.run_id or f"run-{args.ir.stem}"
+    hook = _exec_abort_hook(args)
+    sim_run = SimExecutor(run_id=run_id, should_abort=hook).run(ir)
+    hw_run = run_ir_over_pty(ir, run_id=run_id, should_abort=hook)
+    report = compare_runs(sim_run, hw_run)
+    for line in report.lines():
+        print(line)
+    print("（hw 侧是 pty 设备模拟器：一致的结论属于**模拟器证据**，不代表真机行为）")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"比较结论已写入 {args.json}")
+    return 0 if report.ok else 1
+
+
+def _cmd_hw_unplug_test(args: argparse.Namespace) -> int:
+    import json
+    import time
+
+    from .hw import DeviceSimulator, HwExecutor, PtyPort, validate_hw_run
+
+    ir = _load_ir(args.ir)
+    timeout_s = max(0.001, args.response_timeout_ms / 1000.0)
+    report: dict[str, object] = {"ir": str(args.ir), "unplug_after_steps": args.unplug_after_steps}
+
+    # ① 拔线不重连：必须有明确的断连错误事件，且整次运行不阻塞
+    device = DeviceSimulator(unplug_after_steps=args.unplug_after_steps)
+    port = PtyPort(device)
+    port.plug()
+    executor = HwExecutor(
+        transport_factory=port.connect,
+        run_id=f"run-{args.ir.stem}-unplug",
+        response_timeout_s=timeout_s,
+        reconnect_attempts=0,
+    )
+    started = time.perf_counter()
+    lost_run = executor.run(ir)
+    lost_wall_ms = (time.perf_counter() - started) * 1000.0
+    validate_hw_run(lost_run)
+    error_events = [event for event in lost_run.events if event["phase"] == "error"]
+    lost_code = error_events[-1]["detail"]["code"] if error_events else ""
+    ok_lost = (
+        lost_run.status == "runtime_error"
+        and lost_code == "LB-H001"
+        and lost_wall_ms < max(2000.0, timeout_s * 1000.0 * (len(ir.steps) + 4))
+    )
+    device.close()
+
+    # ② 拔线 + 允许重连：同一条设备插回后接着跑完
+    device2 = DeviceSimulator(unplug_after_steps=args.unplug_after_steps)
+    port2 = PtyPort(device2)
+    port2.plug()
+    executor2 = HwExecutor(
+        transport_factory=port2.connect,
+        run_id=f"run-{args.ir.stem}-reconnect",
+        response_timeout_s=timeout_s,
+        reconnect_attempts=2,
+    )
+    started = time.perf_counter()
+    restored_run = executor2.run(ir)
+    restored_wall_ms = (time.perf_counter() - started) * 1000.0
+    validate_hw_run(restored_run)
+    restored_codes = list(restored_run.codes)
+    ok_restored = (
+        restored_run.status == "ok"
+        and "LB-H001" in restored_codes
+        and "LB-H003" in [str(event["detail"].get("code", "")) for event in restored_run.events]
+        and restored_run.link["reconnects"] >= 1
+    )
+    device2.close()
+
+    report.update(
+        {
+            "lost": {
+                "status": lost_run.status,
+                "codes": list(lost_run.codes),
+                "wall_ms": round(lost_wall_ms, 1),
+                "events": len(lost_run.events),
+                "ok": ok_lost,
+            },
+            "reconnected": {
+                "status": restored_run.status,
+                "codes": restored_codes,
+                "steps_executed": restored_run.steps_executed,
+                "reconnects": restored_run.link["reconnects"],
+                "wall_ms": round(restored_wall_ms, 1),
+                "ok": ok_restored,
+            },
+            "ok": bool(ok_lost and ok_restored),
+        }
+    )
+    print(
+        f"① 拔线不重连：{lost_run.status}，诊断 {list(lost_run.codes)}，"
+        f"实测 {lost_wall_ms:.1f} ms（不阻塞）→ {'通过' if ok_lost else '不通过'}"
+    )
+    print(
+        f"② 拔线后重连：{restored_run.status}，步骤 {restored_run.steps_executed}，"
+        f"重连 {restored_run.link['reconnects']} 次，诊断 {restored_codes}，"
+        f"实测 {restored_wall_ms:.1f} ms → {'通过' if ok_restored else '不通过'}"
+    )
+    print("（两条都是 pty 设备模拟器的结果：属于**模拟器证据**，真实串口拔插待人工验证）")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"结论已写入 {args.json}")
+    return 0 if report["ok"] else 1
+
+
+def _cmd_hw_frames(args: argparse.Namespace) -> int:
+    from .hw import COMMANDS, EVENTS, HW_PROTOCOL_VERSION, crc16_ccitt, event_frame, MAGIC, MAX_PAYLOAD, MAX_SEQ, WIRE_VERSION
+
+    print(f"串口帧格式 hw_protocol_version {HW_PROTOCOL_VERSION}（线格式版本 {WIRE_VERSION}，草案）")
+    print("帧头（9 B）+ 载荷（≤ %d B）+ CRC（2 B，CRC-16/CCITT-FALSE，poly 0x1021 init 0xFFFF）" % MAX_PAYLOAD)
+    print(f"MAGIC={MAGIC.hex(' ').upper()}  序号 1..{MAX_SEQ}（0xFFFF 后回到 1）")
+    print("CRC 自检：crc16_ccitt(b'123456789') = 0x%04X（应等于 0x29B1）" % crc16_ccitt(b"123456789"))
+    print("\n命令（KIND=1）：")
+    for spec in COMMANDS:
+        print(f"  0x{spec.code:02X} {spec.name:<10} 必填 {list(spec.body_keys)} → {list(spec.responses)}")
+    print("\n事件（KIND=2）：")
+    for spec in EVENTS:
+        print(f"  0x{spec.code:02X} {spec.name:<10} 必填 {list(spec.body_keys)}")
+    if args.hexdump:
+        frame = event_frame("PONG", 1, {"nonce": 7, "uptime_ms": 12.5})
+        print(f"\n示例（EVT PONG seq=1）：{frame.hexdump()}")
+    return 0
 
 
 def _cmd_e2e_run(args: argparse.Namespace) -> int:

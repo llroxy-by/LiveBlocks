@@ -183,6 +183,8 @@
 - `phase`：`start` | `finish` | `error` | `log` | `feedback`。
 - `backend`：`sim` | `hw`。任何来自模拟器的事件都必须标 `sim`，禁止以模拟结果冒充硬件验证。
 - `seq` 在单次运行内严格递增，`at_ms` 为相对运行起点的毫秒数。
+- `backend:"hw"` 的串口帧格式、命令 / 事件表与 `LB-H0xx` 链路错误码见 `docs/HW.md`（LB-033，草案）；
+  那一路的证据来自 pty 上的设备模拟器，属于模拟器证据，不是硬件验证。
 
 ### 7.2 `ExecResult`
 
@@ -215,6 +217,7 @@
 | `LB-P0xx` | 语法 | `LB-P003` 期望参数卡但槽位为空 |
 | `LB-I0xx` | 规范化 | `LB-I001` 未知 `op` |
 | `LB-R0xx` | 执行 | `LB-R002` 步数上限、`LB-R003` 超时 |
+| `LB-H0xx` | 硬件后端 / 串口链路（LB-033） | `LB-H001` 串口断连、`LB-H005` 序号乱序（码表见 `docs/HW.md` §6） |
 
 诊断对象统一形状：`{ "code": string, "severity": "info"|"warning"|"error", "message": string, "candidate_ids"?: string[], "span"?: object }`。
 

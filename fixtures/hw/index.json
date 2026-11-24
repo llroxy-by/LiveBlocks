@@ -1,0 +1,104 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "HwFixtureIndex",
+  "hw_protocol_version": "0.0.1",
+  "board": "esp32c3-supermini",
+  "note": "LB-033 的硬件后端夹具：每项是一份合法 Ir（协议 §6）+ 该 IR 经串口协议（pty 上的设备模拟器）执行后的 golden 事件流（§7.1，backend=\"hw\"）、golden ExecResult 与 golden ExecState。golden 由 liveblocks hw run --ir <ir> --events-out <events> --result-out <result> --state-out <state> 生成，逐字节比对。★ 这些 golden 是**模拟器证据**，不是硬件证据：它们证明的是「协议与事件映射按预期工作」，不证明任何真机行为（真实串口 / ESP32-C3 SuperMini 属 LB-020，待人工验证）。",
+  "command": "python -m liveblocks hw run --ir <ir> --events-out <events> --result-out <result> --state-out <state>",
+  "fixtures": [
+    {
+      "name": "all-ops",
+      "ir": "../ir/golden/all-ops.json",
+      "events": "events/all-ops.jsonl",
+      "result": "result/all-ops.json",
+      "state": "state/all-ops.json",
+      "status": "ok",
+      "steps": 8,
+      "events_count": 17,
+      "codes": [],
+      "frames": {
+        "out": 11,
+        "in": 11
+      },
+      "parity": true,
+      "source": "../ir/golden/all-ops.json",
+      "note": "覆盖执行语义表全部 8 个 op：17 条事件、虚拟耗时 140 ms；双后端逐条一致"
+    },
+    {
+      "name": "from-valid-basic",
+      "ir": "../ir/golden/from-valid-basic.json",
+      "events": "events/from-valid-basic.jsonl",
+      "result": "result/from-valid-basic.json",
+      "state": "state/from-valid-basic.json",
+      "status": "ok",
+      "steps": 2,
+      "events_count": 5,
+      "codes": [],
+      "frames": {
+        "out": 5,
+        "in": 5
+      },
+      "parity": true,
+      "source": "../ir/golden/from-valid-basic.json",
+      "note": "两行卡片的最小程序：5 条事件；双后端逐条一致"
+    },
+    {
+      "name": "drop-empty",
+      "ir": "../exec/ir/drop-empty.json",
+      "events": "events/drop-empty.jsonl",
+      "result": "result/drop-empty.json",
+      "state": "state/drop-empty.json",
+      "status": "runtime_error",
+      "steps": 2,
+      "events_count": 7,
+      "codes": [
+        "LB-R005"
+      ],
+      "frames": {
+        "out": 6,
+        "in": 6
+      },
+      "parity": true,
+      "source": "../exec/ir/drop-empty.json",
+      "note": "设备在执行阶段拒绝 drop（LB-R005）：事件 7 条、status=runtime_error，与 sim 一致"
+    },
+    {
+      "name": "timeout-exact",
+      "ir": "../exec/ir/timeout-exact.json",
+      "events": "events/timeout-exact.jsonl",
+      "result": "result/timeout-exact.json",
+      "state": "state/timeout-exact.json",
+      "status": "ok",
+      "steps": 1,
+      "events_count": 3,
+      "codes": [],
+      "frames": {
+        "out": 4,
+        "in": 4
+      },
+      "parity": true,
+      "source": "../exec/ir/timeout-exact.json",
+      "note": "总耗时恰好等于 timeout_ms：status=ok（边界不误判超时）"
+    },
+    {
+      "name": "non-terminating-steps",
+      "ir": "../exec/ir/non-terminating-steps.json",
+      "events": "events/non-terminating-steps.jsonl",
+      "result": "result/non-terminating-steps.json",
+      "state": "state/non-terminating-steps.json",
+      "status": "limit_exceeded",
+      "steps": 10,
+      "events_count": 22,
+      "codes": [
+        "LB-R002"
+      ],
+      "frames": {
+        "out": 13,
+        "in": 13
+      },
+      "parity": true,
+      "source": "../exec/ir/non-terminating-steps.json",
+      "note": "步数上限截断（LB-R002）：22 条事件、status=limit_exceeded"
+    }
+  ]
+}

@@ -379,3 +379,33 @@ A4 标记页的产物，**入库**，用于回归：`liveblocks cardsheet render
    共 6 张 640×480 灰度 PNG，合计约 0.95 MB。
 4. fixtures 只由 `liveblocks synth` 生成，**不要手改**；手改会让 `synth verify` 与
    `tests/test_synth_reproducibility.py` 失败。
+
+## 13. `hw/`（LB-033 硬件后端的 golden 事件流）
+
+`backend:"hw"`（串口协议 + pty 设备模拟器）跑出来的 golden 产物，**入库**，用于回归。
+每项是「一份合法 `Ir` + 该 IR 经串口协议执行后的 §7.1 事件流（JSONL）+ `ExecResult` + `ExecState`」，
+`tests/test_hw_fixtures.py` 会真跑一遍并**逐字节**比对，`index.json` 里的 `status` / `steps` /
+`events_count` / `codes` / `frames` 是期望值。
+
+| 夹具 | 内容 |
+| --- | --- |
+| `all-ops` | 覆盖执行语义表全部 8 个 op 的成功运行：17 条事件、虚拟耗时 140 ms |
+| `from-valid-basic` | 两行卡片的最小程序：5 条事件 |
+| `drop-empty` | 设备在执行阶段拒绝 `drop`（`LB-R005`）：7 条事件、`status=runtime_error` |
+| `timeout-exact` | 总耗时恰好等于 `timeout_ms`：`status=ok`（边界不误判超时） |
+| `non-terminating-steps` | 步数上限截断（`LB-R002`）：22 条事件、`status=limit_exceeded` |
+
+- **怎么生成**（固定虚拟时钟 → 字节可复现；事件里不含墙钟时间）：
+
+  ```bash
+  python -m liveblocks hw run --ir fixtures/ir/golden/all-ops.json \
+    --events-out fixtures/hw/events/all-ops.jsonl \
+    --result-out fixtures/hw/result/all-ops.json \
+    --state-out fixtures/hw/state/all-ops.json
+  ```
+
+- **★ 这些 golden 是模拟器证据，不是硬件证据**：设备是 pty 上的纯 Python 模拟器
+  （`src/liveblocks/hw/device.py`）。它们钉住「帧协议 + 事件映射 + 设备语义」的输出形状，
+  **不**证明任何真机行为；真实串口与真机联调属 LB-020，记在「待人工验证」（`docs/HW.md` §8）。
+- 每个夹具在 `tests/test_backend_parity.py` 里还会与 sim 后端逐事件比对（结构 + 关键状态），
+  因此 golden 同时也是「双后端一致」的证据。
