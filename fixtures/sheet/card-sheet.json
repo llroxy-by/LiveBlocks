@@ -1,0 +1,527 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "CardSheet",
+  "sheet_version": "0.0.1",
+  "generator": "liveblocks cardsheet（LB-032）",
+  "layout": "card-60x40",
+  "layout_version": "0.0.1",
+  "card_dictionary_version": "0.0.1",
+  "aruco_dictionary": "DICT_4X4_50",
+  "batch_id": "lb-b0001",
+  "page": {
+    "paper": "A4",
+    "width_mm": 210.0,
+    "height_mm": 297.0,
+    "margin_mm": 8.0,
+    "gutter_mm": 6.0,
+    "columns": 3,
+    "rows": 6,
+    "capacity": 18,
+    "page_count": 1,
+    "pixels_per_mm": 4.0,
+    "width_px": 840,
+    "height_px": 1188
+  },
+  "quiet_zone": {
+    "face_mm": 2.5,
+    "rule_mm": 4.0,
+    "module_mm": 4.0,
+    "modules": 1,
+    "card_gap_mm": 6.0
+  },
+  "marker": {
+    "size_mm": 24.0,
+    "modules": 6,
+    "data_modules": 4,
+    "border_bits": 1,
+    "module_mm": 4.0
+  },
+  "cut": {
+    "line_mm": 0.2,
+    "gap_mm": 1.0
+  },
+  "orientation_mark_mm": 3.0,
+  "cards": [
+    {
+      "serial": "lb-b0001-p01-01",
+      "slot": 0,
+      "page": 1,
+      "row": 0,
+      "col": 0,
+      "card_id": "C01",
+      "marker_id": 0,
+      "card_type": "action",
+      "card_face": "move-forward",
+      "rect_mm": [
+        8.0,
+        8.0,
+        68.0,
+        48.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        11.5,
+        50.0,
+        35.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-02",
+      "slot": 1,
+      "page": 1,
+      "row": 0,
+      "col": 1,
+      "card_id": "C02",
+      "marker_id": 1,
+      "card_type": "action",
+      "card_face": "move-back",
+      "rect_mm": [
+        74.0,
+        8.0,
+        134.0,
+        48.0
+      ],
+      "marker_rect_mm": [
+        92.0,
+        11.5,
+        116.0,
+        35.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-03",
+      "slot": 2,
+      "page": 1,
+      "row": 0,
+      "col": 2,
+      "card_id": "C03",
+      "marker_id": 2,
+      "card_type": "action",
+      "card_face": "turn-left",
+      "rect_mm": [
+        140.0,
+        8.0,
+        200.0,
+        48.0
+      ],
+      "marker_rect_mm": [
+        158.0,
+        11.5,
+        182.0,
+        35.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-04",
+      "slot": 3,
+      "page": 1,
+      "row": 1,
+      "col": 0,
+      "card_id": "C04",
+      "marker_id": 3,
+      "card_type": "action",
+      "card_face": "turn-right",
+      "rect_mm": [
+        8.0,
+        54.0,
+        68.0,
+        94.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        57.5,
+        50.0,
+        81.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-05",
+      "slot": 4,
+      "page": 1,
+      "row": 1,
+      "col": 1,
+      "card_id": "C05",
+      "marker_id": 4,
+      "card_type": "action",
+      "card_face": "jump",
+      "rect_mm": [
+        74.0,
+        54.0,
+        134.0,
+        94.0
+      ],
+      "marker_rect_mm": [
+        92.0,
+        57.5,
+        116.0,
+        81.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-06",
+      "slot": 5,
+      "page": 1,
+      "row": 1,
+      "col": 2,
+      "card_id": "C06",
+      "marker_id": 5,
+      "card_type": "action",
+      "card_face": "pick",
+      "rect_mm": [
+        140.0,
+        54.0,
+        200.0,
+        94.0
+      ],
+      "marker_rect_mm": [
+        158.0,
+        57.5,
+        182.0,
+        81.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-07",
+      "slot": 6,
+      "page": 1,
+      "row": 2,
+      "col": 0,
+      "card_id": "C07",
+      "marker_id": 6,
+      "card_type": "action",
+      "card_face": "drop",
+      "rect_mm": [
+        8.0,
+        100.0,
+        68.0,
+        140.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        103.5,
+        50.0,
+        127.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-08",
+      "slot": 7,
+      "page": 1,
+      "row": 2,
+      "col": 1,
+      "card_id": "C08",
+      "marker_id": 7,
+      "card_type": "control",
+      "card_face": "repeat",
+      "rect_mm": [
+        74.0,
+        100.0,
+        134.0,
+        140.0
+      ],
+      "marker_rect_mm": [
+        92.0,
+        103.5,
+        116.0,
+        127.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-09",
+      "slot": 8,
+      "page": 1,
+      "row": 2,
+      "col": 2,
+      "card_id": "C09",
+      "marker_id": 8,
+      "card_type": "control",
+      "card_face": "if",
+      "rect_mm": [
+        140.0,
+        100.0,
+        200.0,
+        140.0
+      ],
+      "marker_rect_mm": [
+        158.0,
+        103.5,
+        182.0,
+        127.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-10",
+      "slot": 9,
+      "page": 1,
+      "row": 3,
+      "col": 0,
+      "card_id": "C10",
+      "marker_id": 9,
+      "card_type": "control",
+      "card_face": "end",
+      "rect_mm": [
+        8.0,
+        146.0,
+        68.0,
+        186.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        149.5,
+        50.0,
+        173.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-11",
+      "slot": 10,
+      "page": 1,
+      "row": 3,
+      "col": 1,
+      "card_id": "C11",
+      "marker_id": 10,
+      "card_type": "control",
+      "card_face": "wait",
+      "rect_mm": [
+        74.0,
+        146.0,
+        134.0,
+        186.0
+      ],
+      "marker_rect_mm": [
+        92.0,
+        149.5,
+        116.0,
+        173.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-12",
+      "slot": 11,
+      "page": 1,
+      "row": 3,
+      "col": 2,
+      "card_id": "N01",
+      "marker_id": 11,
+      "card_type": "number",
+      "card_face": "number-1",
+      "rect_mm": [
+        140.0,
+        146.0,
+        200.0,
+        186.0
+      ],
+      "marker_rect_mm": [
+        158.0,
+        149.5,
+        182.0,
+        173.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-13",
+      "slot": 12,
+      "page": 1,
+      "row": 4,
+      "col": 0,
+      "card_id": "N02",
+      "marker_id": 12,
+      "card_type": "number",
+      "card_face": "number-2",
+      "rect_mm": [
+        8.0,
+        192.0,
+        68.0,
+        232.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        195.5,
+        50.0,
+        219.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-14",
+      "slot": 13,
+      "page": 1,
+      "row": 4,
+      "col": 1,
+      "card_id": "N03",
+      "marker_id": 13,
+      "card_type": "number",
+      "card_face": "number-3",
+      "rect_mm": [
+        74.0,
+        192.0,
+        134.0,
+        232.0
+      ],
+      "marker_rect_mm": [
+        92.0,
+        195.5,
+        116.0,
+        219.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-15",
+      "slot": 14,
+      "page": 1,
+      "row": 4,
+      "col": 2,
+      "card_id": "N05",
+      "marker_id": 14,
+      "card_type": "number",
+      "card_face": "number-5",
+      "rect_mm": [
+        140.0,
+        192.0,
+        200.0,
+        232.0
+      ],
+      "marker_rect_mm": [
+        158.0,
+        195.5,
+        182.0,
+        219.5
+      ],
+      "orientation_quadrant": 0
+    },
+    {
+      "serial": "lb-b0001-p01-16",
+      "slot": 15,
+      "page": 1,
+      "row": 5,
+      "col": 0,
+      "card_id": "O01",
+      "marker_id": 15,
+      "card_type": "operator",
+      "card_face": "operator-add",
+      "rect_mm": [
+        8.0,
+        238.0,
+        68.0,
+        278.0
+      ],
+      "marker_rect_mm": [
+        26.0,
+        241.5,
+        50.0,
+        265.5
+      ],
+      "orientation_quadrant": 0
+    }
+  ],
+  "orientation": {
+    "page_top_deg": 0,
+    "per_card": "solid triangle at the card's bottom-left corner, apex pointing to the card top edge",
+    "mark_mm": 3.0
+  },
+  "raster": {
+    "kind": "png-grayscale8",
+    "width_px": 840,
+    "height_px": 1188,
+    "pixel_sha256": "4e07262ab298ea00ae03d19152807b031fd4735573073e9e2261cf980afaee59",
+    "png_sha256": "cf3ae304f06f3254202681fcdaebcb2edb1a1e9226b020d5a91892e54ddaa7ab",
+    "png_bytes": 8920,
+    "pdf_sha256": "876a063f3297d20f8e8cc98eb54c4b29fb4c25907c1504f809fa3add2cec8b8d",
+    "pdf_bytes": 9389
+  },
+  "unmeasured": [
+    {
+      "key": "substrate",
+      "label": "基材（纸 / 卡纸 / PVC / 亚克力）",
+      "value": "—",
+      "unit": "",
+      "source": "无实测依据：不同基材的厚度、白度、不透明度与翘曲都会影响打印与识别",
+      "kind": "unmeasured",
+      "measured": false
+    },
+    {
+      "key": "print_process",
+      "label": "打印工艺（激光 / 喷墨 / 热转印 / 外协印刷）",
+      "value": "—",
+      "unit": "",
+      "source": "无实测依据：本单没有打印机、没有出样、没有测过最小可打印模块",
+      "kind": "unmeasured",
+      "measured": false
+    },
+    {
+      "key": "printed_module_error",
+      "label": "打印后模块边长误差",
+      "value": "—",
+      "unit": "mm",
+      "source": "无实测依据：需要打印后用卡尺/放大镜量（步骤见 §11）",
+      "kind": "unmeasured",
+      "measured": false
+    },
+    {
+      "key": "face_quiet_zone_enough",
+      "label": "卡面 2.5 mm 静区在实体卡上是否够用",
+      "value": "—",
+      "unit": "",
+      "source": "合成图上够用（本单 verify 有证据），但是否够用是打印+拍摄的问题，只能实测（§11）",
+      "kind": "unmeasured",
+      "measured": false
+    },
+    {
+      "key": "recognisable_distance",
+      "label": "可识别距离",
+      "value": "—",
+      "unit": "mm",
+      "source": "无实测依据：合成管线没有景深、运动模糊与真实光照",
+      "kind": "unmeasured",
+      "measured": false
+    },
+    {
+      "key": "paper_scale_error",
+      "label": "打印缩放误差（100% 比例是否准）",
+      "value": "—",
+      "unit": "mm",
+      "source": "无实测依据：不同打印机的「实际尺寸 / 适应页面」选项会缩放页面",
+      "kind": "unmeasured",
+      "measured": false
+    }
+  ],
+  "human_verification": [
+    {
+      "item": "实体卡打印尺寸（是否 100% 原尺寸）",
+      "steps": "① 生成：`liveblocks cardsheet render --out sheet.png --pdf sheet.pdf`；② 打印时关掉「适应页面 / Fit to page」，按 100%（实际尺寸）出纸；③ 卡尺量任意 3 张卡的长边与短边（卡面版式 card-60x40 标称 60×40 mm）与任一标记边长（标称 24 mm），把实测值连打印机型号一起记进 Issue；④ 偏差超过 1 mm 先查打印缩放，**不要**回头改标称值。"
+    },
+    {
+      "item": "打印后模块边长与边缘质量",
+      "steps": "① 打印同一张页；② 用放大镜或手机微距看任一标记的 6×6 模块：黑边是否连贯、最小模块有没有断线或糊边；③ 卡尺量 6 个模块的总长（标称 24 mm）并记实测；④ 结论写进 `docs/PROGRESS.md` 的「待硬件验证」，不要写成「已验证」。"
+    },
+    {
+      "item": "卡面 2.5 mm 静区在实体卡上是否够用",
+      "steps": "卡面声明静区 2.5 mm **小于**静区规则 4 mm（1 个模块）。① 把打印好的卡紧贴另一张卡、再紧贴深色桌面/深色物件摆放；② 用 `liveblocks serve-cam serve` 抓 10 帧以上，看 `liveblocks recognize detect` 是否仍给出正确 `marker_id`；③ 若漏检，把「静区不足」记进 Issue，再决定是否提高版式的 `marker_quiet_zone_mm`（改版式要重生成 fixtures）。"
+    },
+    {
+      "item": "基材与打印工艺",
+      "steps": "① 选一种基材（80 g 纸 / 200 g 卡纸 / PVC）与一种工艺（激光 / 喷墨 / 外协）；② 按上一条打印并测量；③ 记录翘曲、反面透印、墨粉反光对识别的影响；④ 只有实测记录才能把「基材」「打印工艺」两项从「待实测」移出。"
+    },
+    {
+      "item": "可识别距离与角度",
+      "steps": "① 实体卡平放桌面，用 `liveblocks serve-cam serve` 在 0.3 / 0.5 / 0.8 m 与 0° / 15° / 30° 倾角各抓 10 帧；② 记检出率与漏检帧；③ 结论必须带设备型号、分辨率、距离、帧数，缺一项就不算实测。"
+    },
+    {
+      "item": "裁切线是否实用",
+      "steps": "① 按灰线手剪一张卡；② 量剪出来的卡与标称尺寸的偏差；③ 若裁切线压在卡面墨迹上或离得太远，记下实际手剪偏差，再决定是否调整 `CUT_GAP_MM`（属下一轮的设计改动，不在本单）。"
+    }
+  ]
+}

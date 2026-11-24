@@ -58,6 +58,15 @@
   - ``liveblocks calibrate frame``       打印按标定填好 ``intrinsics/distortion`` 的 §2 ``Frame``
   - ``liveblocks calibrate validate``    校验一份标定文件
 
+- LB-032：``cardsheet`` 子命令组（实体卡片规范草案 + 标记页模板生成器）：
+
+  - ``liveblocks cardsheet render --out sheet.png --pdf sheet.pdf``  生成可打印的 A4 标记页
+    （卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记），并写出清单 ``CardSheet`` JSON
+  - ``liveblocks cardsheet verify``   把页面重新识别一遍：逐卡核对 id / 朝向 / 位置，并核对
+    「同参数两次渲染字节一致」，打印验收对照（合成管线；实体卡 = 待人工验证）
+  - ``liveblocks cardsheet stencil``  手绘降级版：把每张卡的 8×8 模块格子印成文字，供没打印机时抄
+  - ``liveblocks cardsheet spec``     打印规范里每个数字的出处（字典 / 版式 / 静区规则 / 待实测）
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -595,7 +604,84 @@ def build_parser() -> argparse.ArgumentParser:
     cal_targets = calibrate_sub.add_parser("targets", help="列出内置标定板与合成预设")
     cal_targets.set_defaults(handler=_cmd_calibrate_targets)
 
+    cardsheet = subparsers.add_parser(
+        "cardsheet",
+        help="实体卡片规范与标记页（LB-032）：A4 标记页 → PNG / PDF，重识别验收，手绘降级版",
+        description=(
+            "按卡片字典与卡面版式生成可打印的 A4 标记页（卡面、静区、裁切线、卡片编号、朝向标记），"
+            "把页面重新识别一遍做验收，并给出手绘降级版。实体卡打印、基材、识别距离不在本命令的"
+            "结论内（见 docs/CARD-SPEC.md §11）。"
+        ),
+    )
+    sheet_sub = cardsheet.add_subparsers(dest="cardsheet_command", required=True)
+
+    sheet_render = sheet_sub.add_parser(
+        "render", help="生成标记页（PNG / 可选 PDF），并写出清单 JSON"
+    )
+    _add_sheet_common(sheet_render)
+    sheet_render.add_argument("--out", type=Path, required=True, help="输出的 PNG 路径")
+    sheet_render.add_argument("--pdf", type=Path, default=None, help="同时输出的 PDF 路径")
+    sheet_render.add_argument("--manifest", type=Path, default=None, help="清单 JSON 的输出路径")
+    sheet_render.set_defaults(handler=_cmd_cardsheet_render)
+
+    sheet_verify = sheet_sub.add_parser(
+        "verify", help="把标记页重新识别一遍并打印验收对照（含旋转与确定性核对）"
+    )
+    _add_sheet_common(sheet_verify)
+    sheet_verify.add_argument(
+        "--block", type=int, default=21, help="识别用的自适应窗口（像素，默认 21，与其它层一致）"
+    )
+    sheet_verify.add_argument("--out-dir", type=Path, default=None, help="把 PNG / PDF / 清单写到该目录")
+    sheet_verify.add_argument("--json", type=Path, default=None, help="把验收结果另存为 JSON")
+    sheet_verify.set_defaults(handler=_cmd_cardsheet_verify)
+
+    sheet_stencil = sheet_sub.add_parser(
+        "stencil", help="手绘降级版：每张卡的 8×8 模块格子（文字版，没打印机时照着抄）"
+    )
+    _add_sheet_common(sheet_stencil)
+    sheet_stencil.add_argument(
+        "--card", default=None, help="只输出这些卡（逗号分隔的 card_id）；默认全部"
+    )
+    sheet_stencil.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    sheet_stencil.set_defaults(handler=_cmd_cardsheet_stencil)
+
+    sheet_spec = sheet_sub.add_parser(
+        "spec", help="打印规范里每个数字的出处（字典 / 版式 / 静区规则 / 待实测）"
+    )
+    _add_sheet_common(sheet_spec)
+    sheet_spec.add_argument("--json", type=Path, default=None, help="把数字清单另存为 JSON")
+    sheet_spec.add_argument(
+        "--doc",
+        type=Path,
+        default=None,
+        help="同时核对规范文档与实现是否一致（如 docs/CARD-SPEC.md）；有缺口时退出码 1",
+    )
+    sheet_spec.set_defaults(handler=_cmd_cardsheet_spec)
+
     return parser
+
+
+def _add_sheet_common(parser: argparse.ArgumentParser) -> None:
+    """标记页各子命令共用的版式参数（与 ``spec.CardSheetSpec.build`` 一一对应）。"""
+    parser.add_argument(
+        "--layout",
+        default=None,
+        help="卡面版式名（默认取 synth_layouts.json 的 default_card_layout）",
+    )
+    parser.add_argument(
+        "--paper", default="A4", help="纸张（目前只有 A4，见 docs/CARD-SPEC.md §8）"
+    )
+    parser.add_argument(
+        "--pixels-per-mm", type=float, default=4.0, help="渲染分辨率（整数，默认 4 px/mm ≈ 102 dpi）"
+    )
+    parser.add_argument("--margin-mm", type=float, default=8.0, help="页边距（毫米，默认 8）")
+    parser.add_argument("--gutter-mm", type=float, default=6.0, help="卡间距（毫米，默认 6）")
+    parser.add_argument(
+        "--batch", default="lb-b0001", help="批次号（默认 lb-b0001；由人给，不由时钟生成）"
+    )
+    parser.add_argument(
+        "--cards", default=None, help="只排这些卡（逗号分隔的 card_id）；默认卡片字典全部"
+    )
 
 
 def _resolve_scenes(requested: str) -> list[str]:
@@ -1584,6 +1670,152 @@ def _cmd_calibrate_validate(args: argparse.Namespace) -> int:
 
     calibration = CalibrationFile.from_dict(document)
     print(f"合格：{calibration.describe()}")
+    return 0
+
+
+# --- LB-032：cardsheet（实体卡片规范与标记页） -----------------------------------------
+
+
+def _sheet_spec_from_args(args: argparse.Namespace):
+    """按命令行参数构造标记页规格（``SheetError`` 由各 handler 统一转成退出码 1）。"""
+    from .sheet import CardSheetSpec
+
+    card_ids = None
+    if getattr(args, "cards", None):
+        card_ids = [part.strip() for part in args.cards.split(",") if part.strip()]
+    return CardSheetSpec.build(
+        layout_name=args.layout,
+        paper=args.paper,
+        margin_mm=args.margin_mm,
+        gutter_mm=args.gutter_mm,
+        pixels_per_mm=args.pixels_per_mm,
+        batch_id=args.batch,
+        card_ids=card_ids,
+    )
+
+
+def _cmd_cardsheet_render(args: argparse.Namespace) -> int:
+    from .sheet import SheetError, render_sheet, verify_sheet
+
+    try:
+        spec = _sheet_spec_from_args(args)
+        image = render_sheet(spec)
+    except SheetError as error:
+        print(f"标记页生成失败：{error}", file=sys.stderr)
+        return 1
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_bytes(image.png)
+    print(
+        f"已写出标记页 {args.out}（{image.width}×{image.height} px @ {spec.pixels_per_mm:g} px/mm，"
+        f"{spec.paper} {spec.paper_width_mm:g}×{spec.paper_height_mm:g} mm，"
+        f"{len(spec.cards)} 张卡 / {spec.page_count} 页）"
+    )
+    if args.pdf is not None:
+        args.pdf.parent.mkdir(parents=True, exist_ok=True)
+        args.pdf.write_bytes(image.pdf)
+        print(f"已写出 PDF {args.pdf}（{len(image.pdf)} 字节，页面按 A4 整页铺满）")
+    if args.manifest is not None:
+        args.manifest.parent.mkdir(parents=True, exist_ok=True)
+        args.manifest.write_text(image.manifest_json, encoding="utf-8")
+        print(f"已写出清单 {args.manifest}（kind=CardSheet，含批次编号与产物指纹）")
+    print(
+        f"  静区：卡面声明 {spec.quiet_zone_face_mm:g} mm，规则 {spec.quiet_zone_rule_mm:g} mm"
+        f"（1 个模块 {spec.module_mm:g} mm），卡间距 {spec.gutter_mm:g} mm"
+    )
+    print(f"  PNG sha256 {image.png_sha256}（同参数两次渲染字节一致）")
+    print("实体卡打印尺寸、基材、打印工艺与识别距离 = 待人工验证（docs/CARD-SPEC.md §11）")
+    return 0
+
+
+def _cmd_cardsheet_verify(args: argparse.Namespace) -> int:
+    import json
+
+    from .sheet import SheetError, format_report, verify_sheet
+
+    try:
+        spec = _sheet_spec_from_args(args)
+        verification = verify_sheet(spec, block=args.block)
+    except SheetError as error:
+        print(f"标记页验收无法完成：{error}", file=sys.stderr)
+        return 1
+    print(format_report(verification), end="")
+    if args.out_dir is not None:
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        (args.out_dir / "card-sheet.png").write_bytes(verification.image.png)
+        (args.out_dir / "card-sheet.pdf").write_bytes(verification.image.pdf)
+        (args.out_dir / "card-sheet.json").write_text(
+            verification.image.manifest_json, encoding="utf-8"
+        )
+        print(f"产物已写入 {args.out_dir}（card-sheet.png / card-sheet.pdf / card-sheet.json）")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(verification.to_dict(), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"验收结果已写入 {args.json}")
+    return 0 if verification.passes() else 1
+
+
+def _cmd_cardsheet_stencil(args: argparse.Namespace) -> int:
+    from .sheet import SheetError, format_stencil
+
+    card_ids = None
+    if args.card:
+        card_ids = [part.strip() for part in args.card.split(",") if part.strip()]
+    try:
+        spec = _sheet_spec_from_args(args)
+        text = format_stencil(spec, card_ids)
+    except SheetError as error:
+        print(f"手绘说明生成失败：{error}", file=sys.stderr)
+        return 1
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
+        print(f"手绘说明已写入 {args.out}（{len(card_ids) if card_ids else len(spec.cards)} 张卡）")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def _cmd_cardsheet_spec(args: argparse.Namespace) -> int:
+    import json
+
+    from .sheet import SheetError, all_numbers
+
+    try:
+        spec = _sheet_spec_from_args(args)
+    except SheetError as error:
+        print(f"规范数字无法列出：{error}", file=sys.stderr)
+        return 1
+    numbers = all_numbers(spec)
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps([entry.to_dict() for entry in numbers], ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"数字清单已写入 {args.json}")
+    print("规范数字（每个数字的出处；可追溯 = 对字典/版式/规则的读取或派生，待实测 = 无实测依据）")
+    for entry in numbers:
+        status = "可追溯" if entry.measured else "待实测"
+        value = entry.value_text or "—"
+        print(f"  [{status}] {entry.label}：{value}  ← {entry.source}")
+    unmeasured = sum(1 for entry in numbers if not entry.measured)
+    print(f"  合计 {len(numbers)} 项，其中待实测 {unmeasured} 项（代理不得代填数值）")
+    if args.doc is not None:
+        from .sheet.codes import diagnostic
+        from .sheet.docs import card_spec_document_gaps
+
+        gaps = card_spec_document_gaps(args.doc.read_text(encoding="utf-8"))
+        if not gaps:
+            print(f"  文档核对：{args.doc} 与实现一致（缺口 0 项）")
+            return 0
+        for gap in gaps:
+            entry = diagnostic("LB-S007", "error", gap)
+            print(f"  {entry['code']} {entry['severity']} {entry['message']}", file=sys.stderr)
+        print(f"  文档核对：{args.doc} 有 {len(gaps)} 项缺口", file=sys.stderr)
+        return 1
     return 0
 
 
