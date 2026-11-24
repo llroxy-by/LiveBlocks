@@ -25,7 +25,7 @@ _FRAME_ID_SAFE = re.compile(r"[^0-9A-Za-z_.-]+")
 
 @dataclass(frozen=True)
 class Intrinsics:
-    """针孔相机内参（无畸变；标定与畸变留到 LB-010）。"""
+    """针孔相机内参（``distortion`` 单独给出，见 :class:`Distortion` 与 LB-031）。"""
 
     fx: float
     fy: float
@@ -41,6 +41,39 @@ class Intrinsics:
 
 
 @dataclass(frozen=True)
+class Distortion:
+    """镜头畸变（``docs/PROTOCOL.md`` §2 的 ``plumb_bob``：径向 + 切向）。
+
+    LB-031 的标定文件里就是这五个字段；全 0 表示「按无畸变处理」，与只给内参的旧行为一致。
+    """
+
+    k1: float = 0.0
+    k2: float = 0.0
+    p1: float = 0.0
+    p2: float = 0.0
+    model: str = "plumb_bob"
+
+    def to_dict(self) -> dict[str, float | str]:
+        return {
+            "model": self.model,
+            "k1": self.k1,
+            "k2": self.k2,
+            "p1": self.p1,
+            "p2": self.p2,
+        }
+
+    @classmethod
+    def from_dict(cls, document: dict[str, object]) -> "Distortion":
+        return cls(
+            k1=float(document.get("k1", 0.0)),  # type: ignore[arg-type]
+            k2=float(document.get("k2", 0.0)),  # type: ignore[arg-type]
+            p1=float(document.get("p1", 0.0)),  # type: ignore[arg-type]
+            p2=float(document.get("p2", 0.0)),  # type: ignore[arg-type]
+            model=str(document.get("model", "plumb_bob")),
+        )
+
+
+@dataclass(frozen=True)
 class Frame:
     """一帧输入图像。"""
 
@@ -49,6 +82,7 @@ class Frame:
     image_ref: str
     source: str = "synthetic"
     intrinsics: Intrinsics | None = None
+    distortion: "Distortion | None" = None
     captured_at_ms: float = 0.0
     calibration_id: str = "calib-default"
 
@@ -75,13 +109,8 @@ class Frame:
         }
         if self.intrinsics is not None:
             document["intrinsics"] = self.intrinsics.to_dict()
-            document["distortion"] = {
-                "model": "plumb_bob",
-                "k1": 0.0,
-                "k2": 0.0,
-                "p1": 0.0,
-                "p2": 0.0,
-            }
+            distortion = self.distortion or Distortion()
+            document["distortion"] = distortion.to_dict()
         return document
 
 
@@ -97,6 +126,7 @@ def load_frame(
     frame_id: str | None = None,
     source: str = "synthetic",
     intrinsics: Intrinsics | None = None,
+    distortion: "Distortion | None" = None,
     image_ref: str | None = None,
 ) -> Frame:
     """读一张 PNG 灰度图并包装成 ``Frame``。"""
@@ -108,4 +138,5 @@ def load_frame(
         image_ref=image_ref or path.name,
         source=source,
         intrinsics=intrinsics,
+        distortion=distortion,
     )

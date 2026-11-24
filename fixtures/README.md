@@ -324,7 +324,28 @@ fixtures/live/
   （不是独立测量）。四角拿不到的卡**不进** `scene.json`（不猜坐标），只留在 `capture.json`。
 - 采集命令：`liveblocks serve-cam serve` → 浏览器打开打印出来的地址（细节见 `docs/CAPTURE.md`）。
 
-## 11. 约定
+## 11. `calib/`（LB-031 标定文件 golden）
+
+合成场景跑一遍标定后写出的标定文件，**入库**，用于回归：`liveblocks calibrate report --preset all
+--golden fixtures/calib` 会把本次生成的 JSON 与这里的文件**逐字节**比对。
+
+| 文件 | 内容 |
+| --- | --- |
+| `checkerboard.json` | 9×6 棋盘（25 mm 方块）预设的标定文件：内参、`plumb_bob` 畸变、重投影误差、图像尺寸、标定图数量、时间戳 |
+| `charuco.json` | 8×6 ChArUco（20 mm 格子 / 12 mm 标记 `DICT_4X4_50`）预设的标定文件 |
+
+- **怎么生成**（固定时间戳 → 字节可复现）：
+
+  ```bash
+  liveblocks calibrate report --preset all --out-dir fixtures/calib --golden fixtures/calib
+  ```
+
+- **为什么入库**：它们是小体积 JSON（约 3 KB/份），且完全由「预设 + 种子」决定，
+  适合当快照；图像本身不入库（`calibrate report` 每次现场渲染，约 40 秒）。
+- **不能当实测结论**：`status` 是 `synthetic`，`notes` 里写明了这一点。
+  真实摄像头的标定文件应由人按 `docs/CALIB.md` §8 实测生成，**不要覆盖**这两份 golden。
+
+## 12. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

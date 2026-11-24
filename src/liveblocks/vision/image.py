@@ -127,11 +127,17 @@ def adaptive_binary(
     return mask
 
 
-def connected_components(mask: bytearray, width: int, height: int, *, min_area: int = 1) -> list[list[int]]:
-    """8 连通的暗像素连通域，返回每个连通域的像素下标列表（按扫描顺序）。
+def connected_components(
+    mask: bytearray, width: int, height: int, *, min_area: int = 1, connectivity: int = 8
+) -> list[list[int]]:
+    """暗像素连通域，返回每个连通域的像素下标列表（按扫描顺序）。
 
+    ``connectivity`` 为 8（默认，标记的黑边与内圈模块必须连成一个域）或 4（LB-031 的
+    棋盘格方块：黑白格只在角点处「点接触」，用 4 连通才不会把整块棋盘粘成一个域）。
     用显式栈做深度优先，避免递归深度限制；面积为 ``min_area`` 以下的连通域直接丢弃。
     """
+    if connectivity not in (4, 8):
+        raise ValueError(f"connectivity 只能是 4 或 8：{connectivity}")
     if len(mask) != width * height:
         raise ValueError("掩码尺寸与图像尺寸不符")
     seen = bytearray(width * height)
@@ -152,6 +158,8 @@ def connected_components(mask: bytearray, width: int, height: int, *, min_area: 
                     continue
                 base = ny * width
                 for dx in (-1, 0, 1):
+                    if connectivity == 4 and dx != 0 and dy != 0:
+                        continue
                     nx = x + dx
                     if nx < 0 or nx >= width:
                         continue

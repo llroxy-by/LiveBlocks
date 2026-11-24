@@ -6,6 +6,10 @@
 
 本模块**不做识别**，也不评估识别效果（见 ``docs/ROADMAP.md`` LB-002 与 Issue #7）。
 
+LB-031 起，本模块还提供「镜头畸变模型」（:class:`LensModel`）与「标定板 + 带畸变的拍摄图」
+（:class:`CalibTarget` / :func:`render_capture`）：真值内参与畸变已知的合成标定数据，
+标定算法（``liveblocks.calib``）与校正（``undistort_raster``）共用同一套数学。
+
 典型用法::
 
     from liveblocks.synth import generate_scene, write_scene
@@ -31,18 +35,23 @@ from .generator import (
     write_index,
     write_scene,
 )
+from .calibtarget import CalibTarget, CalibrationCapture, render_capture
 from .geometry import Camera, Pose
+from .lens import LensModel, distort_raster, undistort_raster
 from .spec import Lighting, Occluder, Placement, SceneSpec, load_layouts, scene_names
 from .texture import CardLayout, CardTexture, render_card_texture
 
 __all__ = [
     "ArucoDictionary",
+    "CalibTarget",
+    "CalibrationCapture",
     "Camera",
     "CardDictionary",
     "CardEntry",
     "CardLayout",
     "CardTexture",
     "GeneratedScene",
+    "LensModel",
     "Lighting",
     "Occluder",
     "Placement",
@@ -54,8 +63,11 @@ __all__ = [
     "load_aruco_dictionaries",
     "load_card_dictionary",
     "load_layouts",
+    "distort_raster",
+    "render_capture",
     "render_card_texture",
     "scene_names",
+    "undistort_raster",
     "write_index",
     "write_scene",
 ]
