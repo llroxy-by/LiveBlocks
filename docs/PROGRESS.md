@@ -5,7 +5,8 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-009 端到端回归与运行记录：`liveblocks e2e run` 一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 JSONL；`liveblocks e2e regression` 做记录形状校验 + 指纹式黄金基准 + 破坏注入自检 + 固定时间上界，PR 见本仓库 `agent/lb-e2e-regression-*` 分支）
+> 最近更新：2026-11-24（LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
+> 上一轮：LB-009 端到端回归与运行记录（`liveblocks e2e run` / `e2e regression`）
 
 ## 1. 已验证
 
@@ -105,9 +106,18 @@
 
 **说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，**LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim），以及 **LB-008 调试视图**在 `fixtures/runs` 运行记录上的五层同屏 / 两次回放一致 / 坏记录可见提示 / 真实渲染截图四项结论，以及 **LB-009 端到端回归与运行记录**在 `fixtures/e2e` 黄金基准上的「一条命令跑六阶段 / 记录形状合格 / 破坏注入被抓到并点名到层 / 固定时间上界」四项结论；运行记录的「生产」已经落在 `src/liveblocks/e2e/`（不再依赖任何拼记录的脚本）。**仍没有任何真实摄像头 / 实体卡片 / 硬件的证据**（见 §3）。
 
+| LB-030 一条命令起本地服务 + 浏览器页面选任意摄像头（`getUserMedia`），支持单帧抓拍与连续取帧 | `liveblocks serve-cam serve --port 8877` → 打印 `http://127.0.0.1:8877/`、采集目录与「Ctrl-C 停止」提示；`curl http://127.0.0.1:8877/api/health` → `200`，`kind=ServeCamHealth`、`service=lb-030-serve-cam`；`tests/test_serve_cam_cli.py::test_server_really_binds_and_serves` 在端口 0 上真起一次 `wsgiref` 服务器并用 `urllib` 打 `/api/health` 与 `/`；页面里 `getUserMedia` / `facingMode`（前置 `user`、后置 `environment`）/ `enumerateDevices` / `setInterval`（连续取帧）齐备 | LB-030 PR（Python 3.14.4 / pytest 9.2.0） |
+| LB-030 验收①（离线）：`/api/frame` 返回的 §3 `CardCandidateList` 与 `recognize detect` 命令行**逐字段一致**，叠加图 PNG 可解码且尺寸与输入一致 | `pytest tests/test_serve_cam.py` → 20 passed（6 个场景参数化）：对 `fixtures/scenes/*.png` 逐场景把「TestClient 上传 `/api/frame`」与「`liveblocks recognize detect --image … --out …`」两份 §3 文档做 `==` 断言（含 `frame_id=f-<场景>`）；叠加图用 `synth.png.decode_gray` 解码后断言（宽,高）与输入相同、改动像素 > 100、出现 245 级叠加墨迹。真实 HTTP 复跑：`curl -X POST --data-binary @fixtures/scenes/normal.png -H 'Content-Type: image/png' -H 'Content-Disposition: attachment; filename="normal.png"' http://127.0.0.1:8877/api/frame` → `HTTP 200`，`card_candidate_list == CLI` 为 `True`，叠加图 640×480（130313 字节） | 同上 |
+| LB-030 验收②（离线）：采集目录能被 `recognize report` 直接消费 | `POST /api/capture` 落成 `fixtures/live/<时间戳>/{frame.png,scene.json,capture.json,index.json}`（`scene.json` 的 `kind` 是 `LiveCaptureScene`，与合成真值字段同构）；`liveblocks recognize report --dir <采集目录>` → 退出码 0、`1 个场景，预期 1 张卡`、识别 1 / 漏检 0、召回率 100.0%；`tests/test_serve_cam.py` 另有 `evaluate_directory()` 与**子进程** `python -m liveblocks recognize report --dir` 双路径断言，`tests/test_serve_cam_capture.py` 再覆盖 multi-row 6 卡 6/6、`card-40x40` 版式与 `clipped` / `slight-rotation` 场景 | 同上 |
+| LB-030 验收③（离线）：页面无外网 CDN 依赖，断网可加载（相机权限除外） | `curl http://127.0.0.1:8877/` → `200`、`19748` 字节、`text/html`；正文里 `http://` / `https://` / `//cdn` / `cdn.` / `<link` / `unpkg` / `jsdelivr` 的 `grep -c` 全为 **0**，`getUserMedia` 出现 1 次；`tests/test_serve_cam_page.py`（19 例）断言单文件（1 个内联 `<script>`、样式内联、无 `<link>`）、21 个控件齐全、所有 `fetch` 都是本进程相对路径且落在 `/api/info` 的路由表内、`serve-cam page` 导出的字节与 `/` 返回的字节相等 | 同上 |
+| LB-030「这帧识别错了」的失败样本单独归档 | 页面勾选后 `outcome=misrecognised` → 落 `fixtures/live/refused/<时间戳>/`（与正常样本同构）；实跑 `POST /api/capture {"outcome":"misrecognised","annotations":[{"card_id":"C02"}]}` → 目录 `<live>/refused/20261124T051823Z-ffa4db`，`warnings` 如实列出「标记 1 没被检出，借用唯一标记候选的角点」「status 记 ok 且 status_assumed=true」「1 张标注与识别不一致」；`GET /api/captures` → `count 2`、`{"accepted":1,"misrecognised":1}`；对该目录跑 `recognize report` → 预期 1 / 识别 0 / 漏检 1（坏样本被如实扣分） | 同上 |
+| LB-030 人工标注的校验与「不猜坐标」 | `tests/test_serve_cam_capture.py`（23 例）：缺标注 / 非法 `status` / 非四点角点 / 非法 `outcome` → `400 LB-C006`；字典外的卡片 id → 样本存档但**不进** `scene.json`（`rejected_annotations` + 警告，`report_usable=false`）；两张标注只检出一个标记 → 另一张不给坐标、只留警告；唯一标注 + 唯一标记时借用该四边形并记 `corner_source=detected-single-marker`；四角来源 `detected` / `manual` / `detected-single-marker` 与 `center_source=card-geometry-from-marker-quad` 都落盘可查 | 同上 |
+| LB-030 采集台契约文档可被机器核对 | `docs/CAPTURE.md`（草案 `capture_version` 0.0.1）+ `liveblocks.serve_cam.docs.capture_document_gaps()` → 缺口 0；`tests/test_serve_cam_docs.py`（27 例）含 6 例**反向验证**（删错误码行 / 删路由 / 删 `kind` / 删命令 / 删「待人工验证」→ 必须报缺口），并有「文档里的路由 ↔ `/api/info` 路由表」双向核对 | 同上 |
+| LB-030 测试与本地检查 | `PYTHON=/tmp/lb-venv-cam/bin/python bash scripts/check.sh` → `compileall` 通过、`==> 检查通过`、`1145 passed, 3 skipped in 158.30s`（跳过的 3 项是只有装 OpenCV / jsonschema 才跑的可选交叉核对）；其中新增 153 例：`test_serve_cam.py` 20、`test_serve_cam_api.py` 26、`test_serve_cam_capture.py` 23、`test_serve_cam_page.py` 19、`test_serve_cam_overlay.py` 18、`test_serve_cam_docs.py` 27、`test_serve_cam_cli.py` 20（单独跑 `pytest tests/test_serve_cam*.py` → `153 passed in 19.78s`） | 同上 |
+
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-009 已完成并迁至 §1「已验证」（P0 软件 MVP 的 9 条已全部落地：一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 运行记录）；其余条目尚未开始（LB-010 起的硬件任务需要人授权与实测）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-009、LB-030 已完成并迁至 §1「已验证」（P0 软件 MVP 的 9 条已全部落地：一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 运行记录）；其余条目尚未开始（LB-010 起的硬件任务需要人授权与实测）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
@@ -128,6 +138,7 @@
 | HW-5 电源 | `PW-1` … `PW-6`（输入电压、峰值电流、独立供电、共地、软开关、温升） | §2 |
 | HW-6 引脚 | `PN-1` … `PN-8`（接口、总线、灯效数据脚、按键、调试口、中断与保留脚、地线与屏蔽、启动/复位脚） | §3 |
 | HW-7 环境与安装 | 桌面材质、环境光与频闪、工作距离与俯角、摄像头固定与标定流程 | §4 |
+| **LB-030 验收④（待人工验证）** | 在**手机上**打开采集台、选**后置摄像头**、对着一张**实体卡片**能看到叠加框与该卡的 `card_id`（可选再验「识别错了」归档）。代理没有手机/实体卡/相机，**不得代填**；人工步骤与通过标准见 `docs/CAPTURE.md` §6，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CAPTURE.md` §6、`docs/ROADMAP.md` LB-030 |
 | HW-8 真实闭环 | LB-010 / LB-011 / LB-012 / LB-013 / LB-020 的端到端联调与延迟 | `docs/ROADMAP.md` §3 |
 
 ## 4. 已知限制与阻塞
@@ -196,6 +207,27 @@
 - **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
 - **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点（LB-005 的 P0 文法按 D-005 的方向落地，取舍与缺口见 D-016）。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。
+- **LB-030 已知限制（详见 `docs/DECISIONS.md` D-021 与 `docs/CAPTURE.md` §8）**：
+  1. **只吃 8bit 灰度**：页面在浏览器里做灰度转换（`0.299R + 0.587G + 0.114B`），PNG 请求体只接受
+     8bit 灰度 PNG；彩色/16bit PNG 直接 `LB-C003` 拒绝（不静默降级）。扩展 `decode_gray` 会动 LB-002
+     的「字节可复现」契约，不在本单范围；
+  2. **实拍真值不是测量**：`status` 缺省 `ok` 且标 `status_assumed`，`center_px` 由「标记四边形 +
+     卡面版式」外推（`center_source`），四角拿不到的卡不进 `scene.json`——所以实拍样本的「卡片中心误差」
+     只说明几何自洽，**不能当识别精度**引用；
+  3. **没有标定**：`Frame.intrinsics` 不填（LB-031 的范围），实拍样本的 §3 输出里没有位姿；
+  4. **帧令牌是内存态**：只留最近 16 帧，进程重启即失效（`LB-C007`），落盘产物不受影响；
+  5. **不做公网鉴权**：默认只绑 `127.0.0.1`；`--host 0.0.0.0` 的局域网暴露与手机 `getUserMedia`
+     所需的 HTTPS 都留给运维侧隧道（「不做」的一条），代理未做也未验证这条链路；
+  6. **页面一次只标一张卡**：API 的 `annotations[]` 支持多条（multi-row 6 卡在测试里这样跑通），
+     但页面表单只填一条；不支持采完改判（重采，或在 `capture.json` 里如实记一笔后重采）；
+  7. **叠加图只画识别层**：不画排列槽位（要五层视图用 `liveblocks ui view`）。
+- **LB-030 顺带发现的 LB-003 统计缺陷（未修，只报告）**：`vision.stats._evaluate_result` 的「误检（extra）」
+  在结构上恒为 0——`identified_markers` 只在遍历真值卡片时填充，因此「真值里不存在的 marker」永远进不了
+  这个列表。改了会动 LB-003 的报表口径与既有测试，属另一单；在此之前**不得**把「误检 0」当作识别可靠的证据
+  （LB-030 的 refused 样本只用「识别数 + 漏检 + 状态」说明问题）。
+- **LB-030 未改动 `docs/PROTOCOL.md` 与 `docs/ROADMAP.md`**：协议只报告缺口（`docs/CAPTURE.md` §9），
+  ROADMAP 的范围与优先级一个字节都没改。对上游代码的唯一改动是 `vision/stats.py` 的 `SCENE_KINDS`
+  （加法式：多认一个 `LiveCaptureScene`，合成场景行为不变）。
 - **本单不派发后续工单**：ROADMAP 条目只是 backlog，开新 Issue 需仓库所有者确认（`AGENTS.md` §5）。
 
 ## 5. 更新规则

@@ -35,6 +35,15 @@ from .recognize import RecognitionResult, recognize
 #: 判定「未识别候选落在哪张真值卡上」时，标记四边形的放大比例。
 ATTRIBUTION_MARGIN = 0.35
 
+#: 能进 :func:`evaluate_directory` 的真值 ``kind``。
+#:
+#: ``SyntheticCardScene`` 是 LB-002 的合成场景；``LiveCaptureScene`` 是 LB-030 采集台写下的
+#: **实拍**场景（``fixtures/live/<时间戳>/scene.json``）——两者字段同构（``image.file`` /
+#: ``card_layout`` / ``cards[].marker_id`` / ``marker_corners_px`` / ``center_px`` / ``status``），
+#: 所以同一份统计代码可以直接吃实拍样本。之所以不用同一个 ``kind``：合成图与实拍数据的可信度
+#: 完全不同，文件名/字段里必须能分清（见 ``docs/DECISIONS.md`` D-021）。
+SCENE_KINDS: tuple[str, ...] = ("SyntheticCardScene", "LiveCaptureScene")
+
 
 @dataclass(frozen=True)
 class SceneEvaluation:
@@ -320,7 +329,7 @@ def evaluate_directory(
         if truth_path.name == "index.json":
             continue
         truth = json.loads(truth_path.read_text(encoding="utf-8"))
-        if truth.get("kind") != "SyntheticCardScene":
+        if truth.get("kind") not in SCENE_KINDS:
             continue
         image_path = directory / str(truth["image"]["file"])
         scene_registry = _registry_for_scene(truth, registry, layout_override)
@@ -459,6 +468,7 @@ def format_report(report: EvaluationReport) -> str:
 
 
 __all__ = [
+    "SCENE_KINDS",
     "EvaluationReport",
     "SceneEvaluation",
     "evaluate_directory",

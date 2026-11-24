@@ -41,6 +41,13 @@
   - ``liveblocks ui replay --record <jsonl>``  回放：打印时间线并核对「两次回放一致」
   - ``liveblocks ui report --dir fixtures/runs`` 对运行记录夹具跑一遍并打印验收对照
 
+- LB-030：``serve-cam`` 子命令组（摄像头采集与人工辅助测试台，零新增依赖）：
+
+  - ``liveblocks serve-cam serve``   一条命令起本地服务（页面 getUserMedia 选摄像头、单帧/连续
+    取帧、``/api/frame`` 出 §3 候选与叠加图、``/api/capture`` 落盘到 ``fixtures/live/<时间戳>/``、
+    ``/api/captures`` 列样本，「这帧识别错了」的样本单独进 ``fixtures/live/refused/``）
+  - ``liveblocks serve-cam page``    把自包含页面导出成单个 HTML（断网可打开，便于取证）
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -72,6 +79,11 @@ DEFAULT_RUN_DIR = Path("fixtures/runs")
 DEFAULT_E2E_DIR = Path("fixtures/e2e")
 #: LB-009 的运行记录落盘目录（不入库：``timings_ms`` 是实测墙钟，每跑一次都不一样）。
 DEFAULT_E2E_OUT = Path("runs/e2e")
+#: LB-030 采集台的落盘根目录（每个样本一个子目录；``refused/`` 下是「识别错了」的样本）。
+#: 不入库：实拍样本是人现场采的，一采集就变（见 ``fixtures/README.md`` §10）。
+DEFAULT_LIVE_DIR = Path("fixtures/live")
+#: LB-030 本地服务的默认端口（只绑 127.0.0.1，不对外）。
+DEFAULT_SERVE_CAM_PORT = 8765
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -447,6 +459,42 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ui_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     ui_report.set_defaults(handler=_cmd_ui_report)
+
+    serve_cam = subparsers.add_parser(
+        "serve-cam",
+        help="摄像头采集台（LB-030）：一条命令起本地服务 + 浏览器页面",
+        description=(
+            "起一个只跑在本机的采集服务：页面用 getUserMedia 选任意摄像头，单帧/连续取帧，"
+            "POST /api/frame 返回 §3 候选与识别叠加图，POST /api/capture 把帧与人工标注落成 "
+            "fixtures/live/<时间戳>/（recognize report 可直接消费）。零新增依赖。"
+        ),
+    )
+    serve_cam_sub = serve_cam.add_subparsers(dest="serve_cam_command", required=True)
+
+    serve_cmd = serve_cam_sub.add_parser(
+        "serve", help="起本地服务（打印地址后用浏览器打开；Ctrl-C 停止）"
+    )
+    serve_cmd.add_argument("--host", default="127.0.0.1", help="绑定地址（默认 127.0.0.1；0.0.0.0 会暴露到局域网）")
+    serve_cmd.add_argument("--port", type=int, default=DEFAULT_SERVE_CAM_PORT, help=f"端口（默认 {DEFAULT_SERVE_CAM_PORT}；0 = 由内核分配）")
+    serve_cmd.add_argument(
+        "--live-dir", type=Path, default=DEFAULT_LIVE_DIR, help=f"采集根目录（默认 {DEFAULT_LIVE_DIR}）"
+    )
+    serve_cmd.add_argument(
+        "--card-layout", default=None, help="默认卡面版式（默认取 synth_layouts.json 的 default_card_layout）"
+    )
+    serve_cmd.add_argument("--verbose", action="store_true", help="把每个请求都打到 stderr（默认只打 4xx/5xx）")
+    serve_cmd.add_argument(
+        "--print-url-only",
+        action="store_true",
+        help="只打印将要使用的地址与采集目录后退出（不绑定端口；用于脚本与自检）",
+    )
+    serve_cmd.set_defaults(handler=_cmd_serve_cam_serve)
+
+    page_cmd = serve_cam_sub.add_parser(
+        "page", help="把自包含页面导出成单个 HTML（断网可打开，用于验收③取证）"
+    )
+    page_cmd.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    page_cmd.set_defaults(handler=_cmd_serve_cam_page)
 
     return parser
 
@@ -1121,6 +1169,36 @@ def _cmd_ui_replay(args: argparse.Namespace) -> int:
         f"渲染 {render_ms:.2f} ms"
     )
     return 0 if all(checks.values()) else 1
+
+
+def _serve_cam_config(args: argparse.Namespace):
+    from .serve_cam import ServeCamConfig
+
+    return ServeCamConfig(live_dir=args.live_dir, card_layout=args.card_layout)
+
+
+def _cmd_serve_cam_serve(args: argparse.Namespace) -> int:
+    from .serve_cam.server import banner, serve
+
+    config = _serve_cam_config(args)
+    url = f"http://{args.host}:{args.port}/"
+    if args.print_url_only:
+        print(banner(url, config))
+        return 0
+    return serve(config, host=args.host, port=args.port, verbose=args.verbose)
+
+
+def _cmd_serve_cam_page(args: argparse.Namespace) -> int:
+    from .serve_cam import render_page
+
+    html = render_page()
+    if args.out is None:
+        sys.stdout.write(html.decode("utf-8"))
+        return 0
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_bytes(html)
+    print(f"页面已写入 {args.out}（{len(html)} 字节，自带 CSS/JS，无外链）")
+    return 0
 
 
 def _cmd_ui_report(args: argparse.Namespace) -> int:
