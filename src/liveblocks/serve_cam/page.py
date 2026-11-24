@@ -158,24 +158,34 @@ function describeError(payload) {
 }
 function renderResult(payload, frame, elapsed) {
   const cards = payload.card_candidate_list.cards || [];
+  const identified = cards.filter(card => card.card_id && card.card_id !== 'unknown');
   state.last = { token:payload.frame_token, cards, frameId:payload.frame.frame_id, width:frame.width, height:frame.height };
   state.lastMarkers = payload.marker_candidate_list.markers || [];
   $('overlay').src = 'data:image/png;base64,' + payload.overlay.png_base64;
   const list = $('cardsList');
   list.innerHTML = '';
-  if (!cards.length) {
+  if (!identified.length) {
     const empty = document.createElement('div');
     empty.className = 'status warn';
     empty.textContent = '这一帧没识别到卡片（标记可能太小、太斜或光不够）：调整后重拍。';
     list.appendChild(empty);
   }
-  cards.forEach(card => {
+  cards.forEach((card, index) => {
     const row = document.createElement('div');
     const id = document.createElement('span'); id.className = 'chip id'; id.textContent = card.card_id;
     const face = document.createElement('span'); face.className = 'chip'; face.textContent = card.card_face;
     const status = document.createElement('span'); status.className = 'chip'; status.textContent = card.status;
     const conf = document.createElement('span'); conf.className = 'chip'; conf.textContent = Number(card.confidence).toFixed(2);
     row.append(id, face, status, conf);
+    // The recognition API returns one card candidate per marker in detection order.
+    const marker = state.lastMarkers[index];
+    if (marker && marker.marker_id !== 'unknown' &&
+        card.marker_ids.includes(marker.marker_id) && Number.isFinite(marker.angle_deg)) {
+      const orientation = document.createElement('span');
+      orientation.className = 'chip';
+      orientation.textContent = '标记朝向 ' + marker.angle_deg.toFixed(1) + '°';
+      row.appendChild(orientation);
+    }
     list.appendChild(row);
   });
   $('cardsJson').textContent = JSON.stringify({
@@ -183,12 +193,13 @@ function renderResult(payload, frame, elapsed) {
     marker_count: (payload.marker_candidate_list.markers || []).length,
     cards: cards.map(c => ({ candidate_id:c.candidate_id, card_id:c.card_id, card_face:c.card_face, status:c.status, confidence:c.confidence, marker_ids:c.marker_ids })),
   }, null, 2);
-  if (!state.lastCardPrefilled && cards.length) {
-    $('cardId').value = cards[0].card_id === 'unknown' ? '' : cards[0].card_id;
-    $('role').value = cards[0].card_type && cards[0].card_type !== 'unknown' ? cards[0].card_type : '';
+  if (!state.lastCardPrefilled && identified.length) {
+    const first = identified[0];
+    $('cardId').value = first.card_id;
+    $('role').value = first.card_type && first.card_type !== 'unknown' ? first.card_type : '';
     state.lastCardPrefilled = true;
   }
-  setStatus('识别完成：' + cards.length + ' 张卡，' + frame.width + 'x' + frame.height + '，' + elapsed + ' ms' + (state.timer ? '（连续取帧中）' : ''), 'ok');
+  setStatus('识别完成：' + identified.length + ' 张卡，' + frame.width + 'x' + frame.height + '，' + elapsed + ' ms' + (state.timer ? '（连续取帧中）' : ''), 'ok');
 }
 function toggleContinuous() {
   if ($('continuous').checked) {
