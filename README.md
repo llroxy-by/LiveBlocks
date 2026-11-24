@@ -10,6 +10,7 @@
 - **LB-030 摄像头采集台**把「真实帧从哪来」这件事先接上：一条命令（`liveblocks serve-cam serve`）起本地服务，页面用浏览器 `getUserMedia` 选任意摄像头（手机前置/后置、笔记本内置、USB UVC），支持**单帧抓拍**与**连续取帧**；`POST /api/frame` 返回 §3 `CardCandidateList` 与识别叠加图，`POST /api/capture` 把当前帧与人工标注（卡片 id、角色、可选角点）落成 `fixtures/live/<时间戳>/`——**这份目录能被 `recognize report` 直接消费**；页面能标「这帧识别错了」，坏样本单独归档到 `fixtures/live/refused/`。零新增依赖（标准库 `wsgiref` + 内联 CSS/JS 的单文件页面）。
 - **LB-031 标定（算法侧）**把「物理世界 → 图像」这一层接上：`liveblocks calibrate report` 一条命令在**合成畸变场景**（真值内参已知）上跑完「棋盘格 / ChArUco 标定 → 重投影误差 → 校正前后角点重复性（均值 / 最大值，像素）」，退出码 0；标定结果写成带内参、`plumb_bob` 畸变、重投影误差、图像尺寸、标定图数量与时间戳的 JSON，并能填进 `Frame.intrinsics/distortion`；合成器也多了**镜头畸变模型**（径向 + 切向），按真值内参渲染带畸变的场景作为可复现回归数据。真实摄像头的标定数字**不在验收内**（`docs/CALIB.md` §8 写了人怎么验）。
 - **LB-032 实体卡片规范与标记页**把「卡片本身」这件实体前提写成草案并落成可打印的产物：`docs/CARD-SPEC.md` 覆盖卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项，`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`liveblocks cardsheet verify` 把页面渲染成图再识别，逐卡核对 id / 朝向 / 位置并核对「同参数两次字节一致」，`liveblocks cardsheet stencil` 给没打印机时的手绘降级版。规范里每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」；**实体卡打印、基材、打印工艺、识别距离 = 待人工验证**（`docs/CARD-SPEC.md` §11 写了人怎么验）。
+- **LB-033 硬件后端协议层（模拟器侧）**把「执行器怎么和一块板子说话」先定下来：串口帧格式（帧头 `4C 42` + 长度 + CRC-16/CCITT + 序号 1..0xFFFF）、命令 / 事件表（HELLO / BEGIN / STEP / END / PING 与对应事件）、传输抽象 `Transport`（pty / 真实串口 / 内存三种实现）、`LB-H0xx` 断连·超时·重连·坏帧·乱序错误模型，以及一台用 pty 假装 ESP32-C3 SuperMini 的纯 Python **设备模拟器**。`backend:"hw"` 的事件与 sim 同一份 §7.1 形状；同一份 IR 两种后端逐事件一致（`tests/test_backend_parity.py`）。**全部证据来自模拟器**：真实串口 / 真机 / 拔插属 LB-020，待人工验证。
 - **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。LB-030 的离线验收（§3 逐字段一致、采集目录进 `recognize report`、页面无外网依赖）有真跑证据；但「手机后置摄像头 + 实体卡看到叠加框与卡片 id」这一条**待人工验证**（`docs/CAPTURE.md` §6 写了人怎么验）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
@@ -389,6 +390,38 @@ liveblocks cardsheet spec --doc docs/CARD-SPEC.md
 
 规范与 `LB-S0xx` 码表见 [docs/CARD-SPEC.md](docs/CARD-SPEC.md)（草案 v0.0.1），取舍见
 [docs/DECISIONS.md](docs/DECISIONS.md) D-023。
+
+## 硬件后端协议层（LB-033）
+
+`backend.hw` 的**协议侧**：串口帧格式（帧头 / 长度 / CRC / 序号 / 命令与事件类型）、传输抽象
+`Transport`（`PtyTransport` / `SerialTransport` / `MemoryTransport`）、断连 / 超时 / 重连的错误事件
+模型（`LB-H0xx`），以及一台**纯 Python 设备模拟器**——它用 pty 假装一块 ESP32-C3 SuperMini，
+把整条协议跑起来。事件流与 LB-007 的 sim 完全同一份 §7.1 形状，只把 `backend` 换成 `"hw"`。
+
+> **证据口径**：这里所有「跑通了」的结论都来自 pty 上的设备模拟器，是**模拟器证据，不是硬件证据**。
+> `backend:"hw"` 只说明走的是串口协议这条代码路径，不说明有真板子、也不声称灯效/屏幕被驱动。
+> 真实串口与真机联调属 LB-020，一律「待人工验证」——人怎么验写在 [docs/HW.md](docs/HW.md) §8。
+
+```bash
+# 打印帧格式、CRC 参数、命令 / 事件表与一帧示例的十六进制
+liveblocks hw frames --hexdump
+
+# 走串口协议执行一份 Ir（pty 上的设备模拟器），stdout 打印摘要 + 最终状态 JSON
+liveblocks hw run --ir fixtures/ir/golden/all-ops.json
+
+# 同一 IR 分别用 sim 与 hw 跑，逐事件比较结构与关键状态（退出码 0 = 一致）
+liveblocks hw parity --ir fixtures/ir/golden/all-ops.json
+
+# 拔线复现：① 断连错误事件不阻塞 ② 插回后可重连继续跑（两条都是模拟器证据）
+liveblocks hw unplug-test --ir fixtures/ir/golden/all-ops.json --unplug-after-steps 2
+```
+
+当前实测（模拟器证据）：`hw parity` 对 8 种 IR（含中断 / 步数上限 / 超时 / 空手 `drop`）
+逐事件一致——事件条数、`seq`、`phase`、`step_id`、`at_ms`、`detail`、`ExecResult` 的状态与诊断码、
+`ExecState.world` 全部相等；`hw run` 一次 8 步运行共收发 11 帧（HELLO + BEGIN + STEP×8 + END）；
+`hw unplug-test` 的 ① 在毫秒级结束并给出 `LB-H001`，② 重连后跑完并与 sim 的最终状态一致。
+细节与缺口见 [docs/HW.md](docs/HW.md)（草案 `hw_protocol_version` 0.0.1）、
+[docs/DECISIONS.md](docs/DECISIONS.md) D-024 与 [docs/PROGRESS.md](docs/PROGRESS.md) §3。
 
 ## 文档入口
 

@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecResult",
+  "run_id": "run-all-ops",
+  "status": "ok",
+  "steps_executed": 8,
+  "duration_ms": 140.0,
+  "backend": "hw",
+  "diagnostics": []
+}

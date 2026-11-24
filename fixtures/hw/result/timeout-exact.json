@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecResult",
+  "run_id": "run-timeout-exact",
+  "status": "ok",
+  "steps_executed": 1,
+  "duration_ms": 1000.0,
+  "backend": "hw",
+  "diagnostics": []
+}

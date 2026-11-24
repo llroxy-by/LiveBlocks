@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecResult",
+  "run_id": "run-from-valid-basic",
+  "status": "ok",
+  "steps_executed": 2,
+  "duration_ms": 30.0,
+  "backend": "hw",
+  "diagnostics": []
+}

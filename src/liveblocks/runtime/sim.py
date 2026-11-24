@@ -156,6 +156,64 @@ def apply_step(world: WorldState, step: Any) -> dict[str, Any]:
     )
 
 
+#: 终止判定的文案（sim 与 hw 两个后端共用，避免「同一情形两套说法」）。
+#:
+#: 返回值统一是 ``(code, message, extra)``：``extra`` 直接并进 ``error`` 事件的 ``detail``。
+#: 这些函数只是把 `docs/EXEC.md` §1 的四条判定理由写成可复用的字符串，
+#: 业务判定仍在 :meth:`SimExecutor.run` / :class:`liveblocks.hw.executor.HwExecutor` 里。
+
+
+def abort_stop(steps_executed: int, step_id: str) -> tuple[str, str, dict[str, Any]]:
+    """中断（``LB-R004``）。"""
+    return (
+        DIAG_ABORTED,
+        f"第 {steps_executed} 步执行前收到中断请求（步骤 {step_id} 未执行）；运行以 aborted 结束",
+        {"steps_executed": steps_executed},
+    )
+
+
+def step_limit_stop(
+    *, max_steps: int, steps_executed: int, remaining_steps: int, step_id: str
+) -> tuple[str, str, dict[str, Any]]:
+    """步数上限（``LB-R002``）。"""
+    return (
+        DIAG_STEP_LIMIT,
+        f"已执行 {steps_executed} 步，达到 limits.max_steps={max_steps}，"
+        f"还剩 {remaining_steps} 步未执行（下一步 {step_id}）；运行以 limit_exceeded 结束",
+        {
+            "max_steps": max_steps,
+            "steps_executed": steps_executed,
+            "remaining_steps": remaining_steps,
+        },
+    )
+
+
+def timeout_stop(
+    *, step_id: str, op: str, cost_ms: float, elapsed_ms: float, timeout_ms: int
+) -> tuple[str, str, dict[str, Any]]:
+    """虚拟时钟超时（``LB-R003``）。"""
+    return (
+        DIAG_TIMEOUT,
+        f"步骤 {step_id}（{op}）需要 {cost_ms:g} ms，虚拟时钟已走 {elapsed_ms:g} ms，"
+        f"再加会超过 limits.timeout_ms={timeout_ms}；运行以 timeout 结束",
+        {"timeout_ms": timeout_ms, "elapsed_ms": elapsed_ms, "next_cost_ms": cost_ms},
+    )
+
+
+def runtime_fault_stop(step_id: str, op: str, args: dict[str, Any] | None = None) -> tuple[str, str, dict[str, Any]]:
+    """op 没有执行语义（``LB-R001``）。"""
+    return (
+        DIAG_RUNTIME_FAULT,
+        f"步骤 {step_id} 的 op {op!r} 没有执行语义（或参数取不到非负整数）；运行以 runtime_error 结束",
+        {"op": op, "args": dict(args or {})},
+    )
+
+
+def world_fault_message(fault: WorldFault) -> str:
+    """语义检查失败（如 ``LB-R005``）的收尾文案：设备与模拟后端用同一句。"""
+    return f"{fault.message}；运行以 runtime_error 结束"
+
+
 @dataclass(frozen=True)
 class SimRun:
     """一次模拟运行的产物：事件流 + ``ExecResult`` + 最终状态 + 实测墙钟耗时。"""
@@ -286,59 +344,46 @@ class SimExecutor:
         for position, step in enumerate(ir.steps):
             # 1) 中断：调用方要求停就停（步骤边界，不会打断半步）
             if self._aborted(steps_executed, elapsed_ms):
+                code, message, extra = abort_stop(steps_executed, step.step_id)
                 stop(
                     "aborted",
-                    DIAG_ABORTED,
-                    f"第 {steps_executed} 步执行前收到中断请求（步骤 {step.step_id} 未执行）；运行以 aborted 结束",
+                    code,
+                    message,
                     step.step_id,
-                    {"steps_executed": steps_executed, "remaining_steps": len(ir.steps) - position},
+                    {**extra, "remaining_steps": len(ir.steps) - position},
                 )
                 break
             # 2) 步数上限：达到 max_steps 且还有步骤要跑
             if steps_executed >= limits.max_steps:
-                stop(
-                    "limit_exceeded",
-                    DIAG_STEP_LIMIT,
-                    f"已执行 {steps_executed} 步，达到 limits.max_steps={limits.max_steps}，"
-                    f"还剩 {len(ir.steps) - position} 步未执行（下一步 {step.step_id}）；"
-                    "运行以 limit_exceeded 结束",
-                    step.step_id,
-                    {
-                        "max_steps": limits.max_steps,
-                        "steps_executed": steps_executed,
-                        "remaining_steps": len(ir.steps) - position,
-                    },
+                code, message, extra = step_limit_stop(
+                    max_steps=limits.max_steps,
+                    steps_executed=steps_executed,
+                    remaining_steps=len(ir.steps) - position,
+                    step_id=step.step_id,
                 )
+                stop("limit_exceeded", code, message, step.step_id, extra)
                 break
             # 3) 语义：op 必须在语义表里、参数要能取到
             ticks = step_ticks(step.op, step.args)
             if ticks is None:
-                stop(
-                    "runtime_error",
-                    DIAG_RUNTIME_FAULT,
-                    f"步骤 {step.step_id} 的 op {step.op!r} 没有执行语义（或参数取不到非负整数）；"
-                    "运行以 runtime_error 结束",
-                    step.step_id,
-                    {"op": step.op, "args": dict(step.args) if isinstance(step.args, dict) else {}},
+                code, message, extra = runtime_fault_stop(
+                    step.step_id, step.op, step.args if isinstance(step.args, dict) else {}
                 )
+                stop("runtime_error", code, message, step.step_id, extra)
                 break
             cost_ms = ticks_to_ms(ticks)
             # 4) 超时：下一步会让虚拟耗时超过 timeout_ms 就不执行它，时钟停在超时上限
             if elapsed_ms + cost_ms > float(limits.timeout_ms) + 1e-9:
                 overshoot_from = elapsed_ms
                 elapsed_ms = float(limits.timeout_ms)  # 时钟停在超时上限
-                stop(
-                    "timeout",
-                    DIAG_TIMEOUT,
-                    f"步骤 {step.step_id}（{step.op}）需要 {cost_ms:g} ms，虚拟时钟已走 {overshoot_from:g} ms，"
-                    f"再加会超过 limits.timeout_ms={limits.timeout_ms}；运行以 timeout 结束",
-                    step.step_id,
-                    {
-                        "timeout_ms": limits.timeout_ms,
-                        "elapsed_ms": overshoot_from,
-                        "next_cost_ms": cost_ms,
-                    },
+                code, message, extra = timeout_stop(
+                    step_id=step.step_id,
+                    op=step.op,
+                    cost_ms=cost_ms,
+                    elapsed_ms=overshoot_from,
+                    timeout_ms=limits.timeout_ms,
                 )
+                stop("timeout", code, message, step.step_id, extra)
                 break
 
             emit(
@@ -349,13 +394,7 @@ class SimExecutor:
             try:
                 delta = apply_step(world, step)
             except WorldFault as fault:
-                stop(
-                    "runtime_error",
-                    fault.code,
-                    f"{fault.message}；运行以 runtime_error 结束",
-                    step.step_id,
-                    {"op": step.op},
-                )
+                stop("runtime_error", fault.code, world_fault_message(fault), step.step_id, {"op": step.op})
                 break
             elapsed_ms += cost_ms
             steps_executed += 1
@@ -453,8 +492,13 @@ __all__ = [
     "SimRun",
     "WorldFault",
     "WorldState",
+    "abort_stop",
     "apply_step",
     "ir_from_document",
     "run_ir",
+    "runtime_fault_stop",
+    "step_limit_stop",
+    "timeout_stop",
     "validate_run",
+    "world_fault_message",
 ]

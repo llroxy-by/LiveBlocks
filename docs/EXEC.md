@@ -210,7 +210,8 @@ liveblocks exec report --dir fixtures/exec
 
 ## 10. 明确不做 / 已知缺口
 
-- 不接硬件：没有 `backend.hw` 路径，也没有任何设备协议（LB-013）。
+- 本层（模拟后端）不接硬件：`backend.hw` 的事件映射、串口帧格式、命令/事件表与 `LB-H0xx` 链路
+  错误码见 `docs/HW.md`（LB-033，草案）；本模块只产出 `backend:"sim"` 的事件。
 - 不做界面、不做回放（LB-008）、不做运行记录打包与 `RunHeader`（LB-009）。
 - **协议缺口（只报告，未改 `docs/PROTOCOL.md`；完整清单见 `docs/DECISIONS.md` D-018）**：
   1. §7 没说一步占多少虚拟时间，也没说 `tick` ↔ 毫秒的换算；本实现定为 10 ms/tick；
