@@ -345,7 +345,32 @@ fixtures/live/
 - **不能当实测结论**：`status` 是 `synthetic`，`notes` 里写明了这一点。
   真实摄像头的标定文件应由人按 `docs/CALIB.md` §8 实测生成，**不要覆盖**这两份 golden。
 
-## 12. 约定
+## 12. `sheet/`（LB-032 标记页 golden）
+
+A4 标记页的产物，**入库**，用于回归：`liveblocks cardsheet render` 用默认参数（A4、`card-60x40`
+版式、4 px/mm、批次 `lb-b0001`）重跑一次，三份文件必须与这里**逐字节**相同
+（`tests/test_sheet_cli.py::test_render_matches_the_committed_golden`）。
+
+| 文件 | 内容 |
+| --- | --- |
+| `card-sheet.png` | 标记页光栅（840×1188，8bit 灰度，8920 字节）：16 张卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记 |
+| `card-sheet.pdf` | 同一个光栅的 PDF 容器（单页 A4 595.276×841.89 pt，`/DeviceGray` 图像按整页铺满，9389 字节） |
+| `card-sheet.json` | 清单 `CardSheet`：页面几何、每张卡的卡槽矩形与批次编号（`serial`）、静区规则、产物指纹、待实测项、人工验证步骤 |
+
+- **怎么生成**（参数固定 → 字节可复现，**不要手改**）：
+
+  ```bash
+  liveblocks cardsheet render --out fixtures/sheet/card-sheet.png \
+      --pdf fixtures/sheet/card-sheet.pdf --manifest fixtures/sheet/card-sheet.json
+  ```
+
+- **为什么入库**：三份加起来约 31 KB，且完全由「卡片字典 + 卡面版式 + 生成参数」决定；
+  它们是本层「同参数两次字节一致」这条验收的最强证据（PNG / PDF / 清单各自一个 sha256，
+  写在清单的 `raster` 段里）。
+- **不能当打印结论**：清单里 `unmeasured` 与 `human_verification` 两段如实写着「基材 / 打印工艺 /
+  可识别距离」都没有实测；打印件的尺寸、边缘质量、静区是否够用要人按 `docs/CARD-SPEC.md` §11 验。
+
+## 13. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

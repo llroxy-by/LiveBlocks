@@ -9,6 +9,7 @@
 - **LB-009 端到端回归**把整条软件闭环收成一条命令：`liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并把 §8 运行记录落盘，`liveblocks e2e regression` 再做记录形状校验、**黄金基准**比对、**破坏注入自检**与**固定时间上界**（整份 ≤ 60 s、单条记录 ≤ 20 s），失败时打印失败摘要并点名「最早失败层」。运行记录的生产在包内完成，不依赖 LB-008 为夹具拼记录的脚本。
 - **LB-030 摄像头采集台**把「真实帧从哪来」这件事先接上：一条命令（`liveblocks serve-cam serve`）起本地服务，页面用浏览器 `getUserMedia` 选任意摄像头（手机前置/后置、笔记本内置、USB UVC），支持**单帧抓拍**与**连续取帧**；`POST /api/frame` 返回 §3 `CardCandidateList` 与识别叠加图，`POST /api/capture` 把当前帧与人工标注（卡片 id、角色、可选角点）落成 `fixtures/live/<时间戳>/`——**这份目录能被 `recognize report` 直接消费**；页面能标「这帧识别错了」，坏样本单独归档到 `fixtures/live/refused/`。零新增依赖（标准库 `wsgiref` + 内联 CSS/JS 的单文件页面）。
 - **LB-031 标定（算法侧）**把「物理世界 → 图像」这一层接上：`liveblocks calibrate report` 一条命令在**合成畸变场景**（真值内参已知）上跑完「棋盘格 / ChArUco 标定 → 重投影误差 → 校正前后角点重复性（均值 / 最大值，像素）」，退出码 0；标定结果写成带内参、`plumb_bob` 畸变、重投影误差、图像尺寸、标定图数量与时间戳的 JSON，并能填进 `Frame.intrinsics/distortion`；合成器也多了**镜头畸变模型**（径向 + 切向），按真值内参渲染带畸变的场景作为可复现回归数据。真实摄像头的标定数字**不在验收内**（`docs/CALIB.md` §8 写了人怎么验）。
+- **LB-032 实体卡片规范与标记页**把「卡片本身」这件实体前提写成草案并落成可打印的产物：`docs/CARD-SPEC.md` 覆盖卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项，`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`liveblocks cardsheet verify` 把页面渲染成图再识别，逐卡核对 id / 朝向 / 位置并核对「同参数两次字节一致」，`liveblocks cardsheet stencil` 给没打印机时的手绘降级版。规范里每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」；**实体卡打印、基材、打印工艺、识别距离 = 待人工验证**（`docs/CARD-SPEC.md` §11 写了人怎么验）。
 - **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。LB-030 的离线验收（§3 逐字段一致、采集目录进 `recognize report`、页面无外网依赖）有真跑证据；但「手机后置摄像头 + 实体卡看到叠加框与卡片 id」这一条**待人工验证**（`docs/CAPTURE.md` §6 写了人怎么验）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
@@ -350,6 +351,45 @@ liveblocks calibrate validate --calib calib.json
 规范与格式见 [docs/CALIB.md](docs/CALIB.md)（草案 `0.0.1`），取舍见
 [docs/DECISIONS.md](docs/DECISIONS.md) D-022。
 
+## 实体卡片规范与标记页（LB-032）
+
+卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的规范草案，加上一个把这份规范
+落成 A4 标记页的生成器（零新增依赖：光栅、PNG、PDF 全部标准库）：
+
+```bash
+# 生成标记页：PNG + PDF + 清单（清单 = 这一页应该长什么样的机器可读声明）
+liveblocks cardsheet render --out sheet.png --pdf sheet.pdf --manifest sheet.json
+
+# 验收：渲染 → 重新识别 → 逐卡核对 id / 朝向 / 位置 → 转 90°/180°/270° 再核对 → 确定性
+liveblocks cardsheet verify
+
+# 手绘降级版：每张卡的 8×8 模块格子印成文字（没打印机时照着抄）
+liveblocks cardsheet stencil --out stencil.txt
+
+# 规范里每个数字的出处（可追溯 / 待实测），顺带核对文档与实现是否一致
+liveblocks cardsheet spec --doc docs/CARD-SPEC.md
+```
+
+真跑（默认参数：A4、`card-60x40` 版式、4 px/mm、批次 `lb-b0001`）：
+
+- 标记页 840×1188 px（4 px/mm ≈ 102 dpi）：3 行位 × 6 列位、单页容量 18、16 张卡一页；
+- 把页面渲染成图再识别：**16/16 张卡的 id 全读出**、`status` 全 `ok`、未登记候选 0 个；朝向读数
+  最大偏差 0.00°；卡片中心与清单卡槽中心的偏差 0.000 px（只说明版面几何自洽，不是识别精度）；
+- 把同一页**顺时针转 90°/180°/270°** 再识别：16 张卡仍然全中，角读数按 −90°×圈数偏移（最大偏差
+  0.00°）——这条是为了排除「朝向永远读成 0°」的假通过；
+- **确定性**：同参数两次渲染的 PNG（8920 字节）、PDF（9389 字节）与清单逐字节一致；产物入库
+  `fixtures/sheet/`，`tests/test_sheet_cli.py` 逐字节比对；
+- **数字纪律**：规范里每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则（`liveblocks
+  cardsheet spec` 打印整张溯源表），追不到的——页边距、裁切线宽、渲染分辨率这类排版参数，以及
+  基材、打印工艺、可识别距离——显式标「待实测」；`tests/test_sheet_docs.py` 双向核对并含反向验证；
+- **静区差异如实写**：卡面版式声明的静区 2.5 mm **小于**静区规则 4 mm（1 个模块），合成图上不影响
+  识别，实体卡上够不够用 = **待实测**；
+- 不做：不声称任何打印工艺 / 基材 / 可识别距离的实测结论，不替用户决定卡面美术，不改
+  `docs/ROADMAP.md` 的范围与优先级；**实体卡打印、静区、打印质量、识别距离 = 待人工验证**。
+
+规范与 `LB-S0xx` 码表见 [docs/CARD-SPEC.md](docs/CARD-SPEC.md)（草案 v0.0.1），取舍见
+[docs/DECISIONS.md](docs/DECISIONS.md) D-023。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -363,6 +403,7 @@ liveblocks calibrate validate --calib calib.json
 | [docs/UI.md](docs/UI.md) | S7b 调试视图规范（一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表），**草案** | 草案 v0.0.1（`ui_version` 0.0.1） |
 | [docs/E2E.md](docs/E2E.md) | 端到端回归规范（六阶段链路、§8 记录的生产、黄金基准、失败摘要、固定时间上界、`LB-E0xx` 码表），**草案** | 草案 v0.0.1（`e2e_version` 0.0.1） |
 | [docs/CAPTURE.md](docs/CAPTURE.md) | 摄像头采集台规范（`getUserMedia` 页面、`/api/frame` / `/api/capture` / `/api/captures`、`fixtures/live/` 落盘结构、`LB-C0xx` 码表、人工验证步骤），**草案** | 草案 v0.0.1（`capture_version` 0.0.1） |
+| [docs/CARD-SPEC.md](docs/CARD-SPEC.md) | 实体卡片规范（卡面 / 标记 / 静区 / 基材 / 打印工艺 / 批次编号 / 质检项）+ A4 标记页生成器、`LB-S0xx` 码表、待实测与人工验证步骤，**草案** | 草案 v0.0.1（`sheet_version` 0.0.1） |
 | [docs/CALIB.md](docs/CALIB.md) | 标定与畸变校正规范（棋盘格 / ChArUco 流程、标定文件 JSON、`Frame` 填充路径、`LB-B0xx` 码表、待人工验证步骤），**草案** | 草案 v0.0.1 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |

@@ -5,7 +5,8 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-031 标定算法与标定文件格式（LB-010 算法侧）：棋盘格 / ChArUco 两条流程、标定文件 JSON（内参 + `plumb_bob` 畸变 + 重投影误差 + 图像尺寸 + 标定图数量 + 时间戳）、`Frame.intrinsics/distortion` 的填充路径，以及合成器的**镜头畸变模型**（径向 + 切向）。`liveblocks calibrate report` 一条命令在**合成畸变场景**上打印重投影误差与校正前后角点重复性（均值 / 最大值，像素），退出码 0，标定文件与入库 golden 逐字节一致；真实摄像头的标定数字 = **待人工验证**）
+> 最近更新：2026-11-24（LB-032 实体卡片规范草案与标记页模板生成器：`docs/CARD-SPEC.md` 给出卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的**草案**（每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」）；`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`cardsheet verify` 把页面渲染成图再识别，**16/16 张卡的 id 与朝向全部读出**、转 90°/180°/270° 后朝向跟着转、同参数两次渲染逐字节一致；`cardsheet stencil` 是没打印机时的手绘降级版。实体卡打印 / 基材 / 打印工艺 / 可识别距离 = **待人工验证**）
+> 上上轮：LB-031 标定算法与标定文件格式（LB-010 算法侧）：棋盘格 / ChArUco 两条流程、标定文件 JSON（内参 + `plumb_bob` 畸变 + 重投影误差 + 图像尺寸 + 标定图数量 + 时间戳）、`Frame.intrinsics/distortion` 的填充路径，以及合成器的**镜头畸变模型**（径向 + 切向）。`liveblocks calibrate report` 一条命令在**合成畸变场景**上打印重投影误差与校正前后角点重复性（均值 / 最大值，像素），退出码 0，标定文件与入库 golden 逐字节一致；真实摄像头的标定数字 = **待人工验证**）
 > 上上轮：LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
 > 上一轮：LB-009 端到端回归与运行记录（`liveblocks e2e run` / `e2e regression`）
 
@@ -129,6 +130,16 @@
 | LB-031 文档与码表的正反向核对 | `docs/CALIB.md`（草案 0.0.1）；`tests/test_calib_docs.py` 15 例：8 个 `LB-B0xx` 码与标题必须都在文档里（**并反向验证**：删掉码或标题后核对必须报缺口）、文档里的示例 JSON 必须能被 `CalibrationFile.from_dict` 接受、文档点名的 7 个子命令必须真能解析、「待人工验证」三条与 `report.HUMAN_VERIFICATION` 一致、已知限制（方板歧义 / `k2` 弱约束 / 重复性不因校正变好）必须写在文档里 | LB-031 PR |
 | LB-031 与已有层的兼容：`connected_components` 多一个可选参数、`Frame` 多一个可选字段 | 上游只改两个加法式位置：`vision/image.py::connected_components(..., connectivity=8)`（默认 8，标记检测行为不变）、`vision/frame.py` 的 `Frame.distortion: Distortion | None = None`（默认输出全 0，与旧行为一致）；`python -m pytest` 全量通过、`liveblocks e2e regression` 与 `recognize report` 的输出未变（见本行证据：全量测试输出） | LB-031 PR |
 
+| LB-032 实体卡片规范草案（`docs/CARD-SPEC.md`）：卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项 | 规范见 `docs/CARD-SPEC.md`（草案 v0.0.1 / `sheet_version` 0.0.1，14 章：范围、命令、数字溯源表、静区规则、基材、打印工艺、批次编号、QC 项、A4 排版、手绘降级版、`LB-S0xx` 码表、待人工验证、已知限制、协议缺口）；实现见 `src/liveblocks/sheet/`（`spec` 版式几何 + 数字溯源、`render` 光栅、`pdf` 容器、`manifest` 清单、`verify` 验收、`stencil` 手绘版、`codes` 码表、`docs` 文档核对）；`python -m liveblocks cardsheet spec --doc docs/CARD-SPEC.md` → 「文档核对：docs/CARD-SPEC.md 与实现一致（缺口 0 项）」，退出码 0 | LB-032 PR |
+| LB-032 验收①：生成的标记页经合成管线（渲染成图再识别）能读出**全部**卡片 id 与朝向 | `python -m liveblocks cardsheet verify`（退出码 0）真跑：A4 / `card-60x40` / 4 px/mm / 批次 `lb-b0001`，840×1188 px，3 行位 × 6 列位（容量 18，**16 张卡 1 页**）；逐卡重识别 **16/16 张 id 全读出**、`status` 全 `ok`、**未登记候选 0 个**，朝向读数最大偏差 **0.00°**，识别中心与清单卡槽中心偏差 **0.000 px**（1 px = 0.250 mm）；`tests/test_sheet_verify.py::test_every_card_is_read_back_with_its_identity`、`test_card_centres_match_the_manifest` 断言同一批数字 | LB-032 PR |
+| LB-032 验收①（朝向不是「恒为 0°」的假通过）：同一页转 90°/180°/270° 再识别，角读数按 −90°×圈数偏移 | 同上命令的「旋转核对」段：转 90° → 卡 16 张、期望 −90°、最大偏差 **0.00°**；转 180° → 期望 −180°、**0.00°**；转 270° → 期望 −270°、**0.00°**；跳过旋转核对时该条验收**判未通过**（`verify_sheet(rotations=False)` 不给假通过，CLI 也没有「跳旋转」开关）；`tests/test_sheet_verify.py::test_quarter_turn_rotations_shift_every_angle`、`test_skipping_rotations_cannot_claim_a_pass` | LB-032 PR |
+| LB-032 验收②：规范里每个数字都能追到字典或静区规则，无实测依据的显式标「待实测」 | `python -m liveblocks cardsheet spec` 打印 **34 项**（21 项可追溯 + 7 项设计默认值 + 6 项无实值），其中 **13 项标「待实测」**；`liveblocks.sheet.docs.card_spec_document_gaps()` 对入库文档返回 **0 项缺口**，它同时查：每个 `LB-S0xx` 码与标题、14 个章节标题、每行数字（标签 + 数值 + 单位）、待实测标注、**正文里没有出处的「数字 + 单位」**、以及代码块里的命令能否被 `cli.build_parser()` 解析；`tests/test_sheet_docs.py`（40 例）对每一项都有**反向验证**（删码/删标题/删章节/改数值/去掉「待实测」/加一行实现里查不到的数字/正文塞一个「30 mm」/把 `verify` 写成 `verify-typo`，都必须报缺口） | LB-032 PR |
+| LB-032 验收③：模板生成是确定性的（同参数两次字节一致） | `cardsheet verify` 的第五行验收真跑：PNG `cf3ae304f06f3254`（8920 字节）、PDF `876a063f3297d20f`（9389 字节）、清单 `c92b463ea1ca57b1`（12689 字节）两次渲染**逐字节相同**；产物入库 `fixtures/sheet/card-sheet.{png,pdf,json}`，`tests/test_sheet_cli.py::test_render_matches_the_committed_golden` 用 CLI 重跑并逐字节比对；`tests/test_sheet_render.py::test_render_is_byte_identical_for_the_same_parameters`、`test_different_parameters_change_the_bytes`（换批次号 / 换分辨率都必须变） | LB-032 PR |
+| LB-032 PDF 输出：自己写的单页容器，页面即同一张光栅，零依赖且字节可复现 | `src/liveblocks/sheet/pdf.py`：`/MediaBox [0 0 595.2756 841.8898]`（A4 210×297 mm → 点）、一个 `/DeviceGray` / 8 bit / FlateDecode 图像对象按整页 `cm` 铺满、无 `/Info` / 时间戳 / `/ID`；`tests/test_sheet_pdf.py`（8 例）自验结构：`startxref` 偏移指向 `xref`、每条 xref 偏移都指向 `N 0 obj`、嵌入流解压后**逐字节等于渲染像素**；装了 poppler 时用 `pdfinfo` / `pdftoppm` 当**独立实现**交叉核对（CI 只装 `.[dev]` 时该例 skip） | LB-032 PR |
+| LB-032 手绘降级版（黑白格 + 编号，没打印机时用） | `python -m liveblocks cardsheet stencil --out stencil.txt` 给每张卡一张 8×8 字符网格（外圈 1 格静区、内圈 6×6 标记，`#` 涂黑 / `.` 不涂，每格 4 mm）；网格由位表直接生成，`parse_stencil_blocks()` 反解回 6×6 位串后 **16/16 张卡与 `aruco_dictionaries.json` 逐字符相同**（`tests/test_sheet_stencil.py` 9 例，含「抄错一个格 → 位串必变」的反证与拒绝残缺网格的用例） | LB-032 PR |
+
+| LB-032 全量检查（本地，等价 CI 环境：只装 `.[dev]`） | `PYTHONPATH=src PYTHON=python3 bash scripts/check.sh` → `compileall` 通过、**1351 passed, 2 skipped in 244.14s**、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2）；跳过的 2 项是只有装 OpenCV 才跑的交叉核对（`tests/test_vision_opencv.py`、`tests/test_synth_dictionary.py`）；其中本单新增 7 个测试文件共 **121 例**：`tests/test_sheet_docs.py` 40、`tests/test_sheet_spec.py` 23、`tests/test_sheet_render.py` 16、`tests/test_sheet_verify.py` 13、`tests/test_sheet_cli.py` 12、`tests/test_sheet_stencil.py` 9、`tests/test_sheet_pdf.py` 8 | LB-032 PR |
+
 ## 2. 计划中
 
 对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-009、LB-030 已完成并迁至 §1「已验证」（P0 软件 MVP 的 9 条已全部落地：一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 运行记录）；其余条目尚未开始（LB-010 起的硬件任务需要人授权与实测）。
@@ -154,6 +165,7 @@
 | HW-7 环境与安装 | 桌面材质、环境光与频闪、工作距离与俯角、摄像头固定与标定流程 | §4 |
 | **LB-030 验收④（待人工验证）** | 在**手机上**打开采集台、选**后置摄像头**、对着一张**实体卡片**能看到叠加框与该卡的 `card_id`（可选再验「识别错了」归档）。代理没有手机/实体卡/相机，**不得代填**；人工步骤与通过标准见 `docs/CAPTURE.md` §6，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CAPTURE.md` §6、`docs/ROADMAP.md` LB-030 |
 | **LB-031 真实摄像头标定（待人工验证）** | 在**真实摄像头**上用打印的标定板采 15 张以上板图后跑 `liveblocks calibrate run`，得到该设备的真实重投影误差与内参。代理没有摄像头与实物板，**不得代填**；人工步骤与记录要求见 `docs/CALIB.md` §8，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交。同一节的「可用拍摄距离」与「板面平整度/打印尺寸误差」也都在此列表内 | `docs/CALIB.md` §8、`docs/ROADMAP.md` LB-031 |
+| **LB-032 实体卡片打印（待人工验证）** | 打印 A4 标记页后：① 卡面长边/短边与标称 60×40 mm 的实测偏差（100% 比例是否准）；② 标记 6×6 模块的边缘质量与 6 个模块总长（标称 24 mm）；③ 卡面声明静区 2.5 mm（< 静区规则 4 mm）在贴卡/贴深色物件时是否仍能读出 `marker_id`；④ 基材与打印工艺对翘曲、透印、反光的影响；⑤ 0.3 / 0.5 / 0.8 m 与 0°/15°/30° 下的检出率；⑥ 手剪沿裁切线的偏差。代理没有打印机、卡纸与相机，**不得代填**；人工步骤见 `docs/CARD-SPEC.md` §11（与 `sheet.spec.HUMAN_VERIFICATION` 逐条对应），结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CARD-SPEC.md` §11、`docs/ROADMAP.md` LB-032 |
 | HW-8 真实闭环 | LB-010 / LB-011 / LB-012 / LB-013 / LB-020 的端到端联调与延迟 | `docs/ROADMAP.md` §3 |
 
 ## 4. 已知限制与阻塞
@@ -222,6 +234,21 @@
 - **D-004 未定**：实现语言仍待仓库所有者确认；LB-001 骨架按 D-011 以 Python 3.11 + pytest **临时**落地，换语言需按 D-011 列出的范围重做骨架。
 - **Q1/Q2/Q3/Q4/Q5 未定**：文法与识别细节是提案级，实现时先按最小假设并留扩展点（LB-005 的 P0 文法按 D-005 的方向落地，取舍与缺口见 D-016）。
 - **硬件链路未知**：主机直连 vs MCU 分工（Q10）未定，`backend.hw` 无法设计引脚级细节。
+- **LB-032 已知限制（详见 `docs/DECISIONS.md` D-023 与 `docs/CARD-SPEC.md` §12）**：
+  1. **合成管线 ≠ 实体卡**：`cardsheet verify` 只是把渲染出来的像素当成一帧再识别（无镜头畸变、无运动
+     模糊、无真实光照），它证明的是「版面几何 + 标记编码 + 清单」自洽，不是打印件可识别；
+  2. **分辨率与识别窗口耦合**：默认 4 px/mm 是为 LB-003 的 21 px 自适应窗口选的。实测 6 px/mm（模块
+     24 px）时默认窗口会把整块黑模块当成本地背景而**读不出标记**，要 `--block 31` 才读得出，但那时卡面
+     文字会冒出上百个「形状对、身份未定」的候选；这是实现耦合，不是打印质量结论；
+  3. **只对「16 张卡 / 一页」出过证据**：多页排版的代码路径有单测，没有出样；
+  4. **点阵字形只有 ASCII**：卡面标签与页眉页脚只能是 ASCII，中文卡片名（`label`）不进像素；
+  5. **PDF 只是一个整页图像**：不可搜索、无矢量文字，放大到高倍数会看到像素；裁切线是灰线而不是矢量
+     裁切标记（Marks）；
+  6. **卡面静区小于静区规则**（2.5 mm vs 4 mm）是版式定义带来的既成事实，本单只如实报告与测试，不改版式
+     （改版式要重生成 LB-002 fixtures，属另一单）；
+  7. **没有卡面美术结论**：颜色、图案、正反面印刷都在本单之外。
+- **LB-032 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改，对上游代码（`synth/`、
+  `vision/`）也是一行未改——`sheet` 包只调用它们（`render_card_texture` / `recognize`）。
 - **LB-030 已知限制（详见 `docs/DECISIONS.md` D-021 与 `docs/CAPTURE.md` §8）**：
   1. **只吃 8bit 灰度**：页面在浏览器里做灰度转换（`0.299R + 0.587G + 0.114B`），PNG 请求体只接受
      8bit 灰度 PNG；彩色/16bit PNG 直接 `LB-C003` 拒绝（不静默降级）。扩展 `decode_gray` 会动 LB-002
