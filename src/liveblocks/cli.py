@@ -18,6 +18,11 @@
   - ``liveblocks parse ast --layout <json>``   ``Layout`` → 符合 §5 的 ``Ast``（P0 最小文法）
   - ``liveblocks parse report``                对 ``fixtures/ast`` 跑解析并打印验收对照
 
+- LB-006：``ir`` 子命令组：
+
+  - ``liveblocks ir normalize --ast <json>``   ``Ast`` → 符合 §6 的 ``Ir``（确定性、显式 ``limits``）
+  - ``liveblocks ir report``                   对 ``fixtures/ir`` 跑规范化并与 golden 快照比对
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -39,6 +44,8 @@ DEFAULT_SCENE_DIR = Path("fixtures/scenes")
 DEFAULT_LAYOUT_DIR = Path("fixtures/layouts")
 #: LB-005 的语法夹具目录（``Layout`` JSON + 期望结果清单，见 ``fixtures/README.md`` §5）。
 DEFAULT_AST_DIR = Path("fixtures/ast")
+#: LB-006 的 IR 夹具目录（``Ast`` JSON + golden ``Ir`` + 清单，见 ``fixtures/README.md`` §6）。
+DEFAULT_IR_DIR = Path("fixtures/ir")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -205,6 +212,44 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parse_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     parse_report.set_defaults(handler=_cmd_parse_report)
+
+    ir = subparsers.add_parser(
+        "ir",
+        help="规范化层（LB-006）：Ast → IR",
+        description="把协议 §5 的 Ast 规范化成 §6 的 Ir（确定性、显式 limits）；不执行。",
+    )
+    ir_sub = ir.add_subparsers(dest="ir_command", required=True)
+
+    normalize = ir_sub.add_parser("normalize", help="对一份 Ast JSON 做规范化，输出 §6 的 Ir JSON")
+    normalize.add_argument("--ast", type=Path, required=True, help="输入 Ast JSON（协议 §5）")
+    normalize.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    normalize.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="显式写进 IR 的步数上限（缺省取 §6 示例的 1000）",
+    )
+    normalize.add_argument(
+        "--timeout-ms",
+        type=int,
+        default=None,
+        help="显式写进 IR 的超时上限（毫秒，缺省取 §6 示例的 5000）",
+    )
+    normalize.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="出现 LB-I0xx 规范化诊断时以退出码 1 结束（默认 0：诊断随 Ir 一起输出）",
+    )
+    normalize.set_defaults(handler=_cmd_ir_normalize)
+
+    ir_report = ir_sub.add_parser(
+        "report", help="对 IR 夹具目录跑规范化，并与 golden 快照逐字节比对"
+    )
+    ir_report.add_argument(
+        "--dir", type=Path, default=DEFAULT_IR_DIR, help="IR 夹具目录（默认 fixtures/ir）"
+    )
+    ir_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    ir_report.set_defaults(handler=_cmd_ir_report)
 
     return parser
 
@@ -542,6 +587,69 @@ def _cmd_parse_report(args: argparse.Namespace) -> int:
     report = build_report(args.dir)
     if not report.fixtures:
         print(f"{args.dir} 里没有语法夹具（或清单缺失）")
+        if report.manifest_error:
+            print(f"清单问题：{report.manifest_error}")
+        return 1
+    print(format_report(report), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _cmd_ir_normalize(args: argparse.Namespace) -> int:
+    import json
+
+    from .ir import normalize_ast_document
+
+    if not args.ast.is_file():
+        raise SystemExit(f"找不到 Ast 文件：{args.ast}")
+    try:
+        document = json.loads(args.ast.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"{args.ast} 不是合法 JSON：{error}") from error
+    if not isinstance(document, dict) or document.get("kind") != "Ast":
+        kind = document.get("kind") if isinstance(document, dict) else type(document).__name__
+        raise SystemExit(f"{args.ast} 的 kind 是 {kind!r}，这里需要 Ast（协议 §5）")
+    try:
+        ir = normalize_ast_document(document, max_steps=args.max_steps, timeout_ms=args.timeout_ms)
+    except ValueError as error:
+        raise SystemExit(f"{args.ast} 不是合法的 Ast（或 limits 不合法）：{error}") from error
+
+    text = ir.canonical_text()
+    if args.out is None:
+        print(text, end="")
+    else:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
+        limits = ir.limits.to_dict()
+        print(
+            f"写入 {args.out}（Ir，步骤 {len(ir.steps)}，诊断 {len(ir.diagnostics)} 条，"
+            f"limits max_steps={limits['max_steps']} timeout_ms={limits['timeout_ms']}，"
+            f"sha256={ir.sha256()[:16]}）"
+        )
+    if ir.diagnostics:
+        # 诊断摘要走 stderr，stdout 只有可以原样管道给下游的 JSON。
+        located = "，".join(
+            f"{entry['code']}@行{entry['span'].get('row')}槽{entry['span'].get('slot_from')}"
+            for entry in ir.diagnostics
+        )
+        print(f"规范化诊断 {len(ir.diagnostics)} 条：{located}", file=sys.stderr)
+        return 1 if args.fail_on_error else 0
+    return 0
+
+
+def _cmd_ir_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .ir import build_report, format_report
+
+    report = build_report(args.dir)
+    if not report.fixtures:
+        print(f"{args.dir} 里没有 IR 夹具（或清单缺失）")
         if report.manifest_error:
             print(f"清单问题：{report.manifest_error}")
         return 1

@@ -1,0 +1,152 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "IrFixtureIndex",
+  "ir_version": "0.0.1",
+  "note": "LB-006 的 IR 夹具清单：每项是一份 Ast（协议 §5）与它规范化后的 golden Ir（协议 §6）。steps / ops / codes / limits 是期望值，codes 的顺序就是产出顺序；golden 文件由 liveblocks ir normalize --ast <asts/x.json> --out golden/x.json 生成，逐字节比对。from-*.json 的上游是 fixtures/ast 的真实解析输出（上游快照），其余为手写 Ast。",
+  "fixtures": [
+    {
+      "name": "all-ops",
+      "ast": "asts/all-ops.json",
+      "golden": "golden/all-ops.json",
+      "steps": 8,
+      "ops": [
+        "move-forward",
+        "move-back",
+        "turn-left",
+        "turn-right",
+        "jump",
+        "pick",
+        "drop",
+        "wait"
+      ],
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ast",
+      "note": "覆盖 op 表全部 8 个命令卡面、元数全对：干净的一条链路（8 步、0 诊断）"
+    },
+    {
+      "name": "from-valid-basic",
+      "ast": "asts/from-valid-basic.json",
+      "golden": "golden/from-valid-basic.json",
+      "steps": 2,
+      "ops": [
+        "move-forward",
+        "jump"
+      ],
+      "codes": [
+        "LB-I002"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "liveblocks parse ast --layout fixtures/ast/valid-basic.json",
+      "note": "LB-005 的真实输出：move-forward 1 与 jump 正常，turn-left 2 3 元数不符（LB-I002）→ 2 步 + 1 诊断"
+    },
+    {
+      "name": "from-valid-empty",
+      "ast": "asts/from-valid-empty.json",
+      "golden": "golden/from-valid-empty.json",
+      "steps": 0,
+      "ops": [],
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "liveblocks parse ast --layout fixtures/ast/valid-empty.json",
+      "note": "空程序：0 步、0 诊断，limits 仍然显式出现"
+    },
+    {
+      "name": "from-overlap-cards",
+      "ast": "asts/from-overlap-cards.json",
+      "golden": "golden/from-overlap-cards.json",
+      "steps": 0,
+      "ops": [],
+      "codes": [
+        "LB-I002"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "liveblocks parse ast --layout fixtures/ast/from-overlap-cards.json",
+      "note": "LB-005 的真实输出：单张 move-back 没带数字卡（LB-I002），规范化后 0 步"
+    },
+    {
+      "name": "unknown-op",
+      "ast": "asts/unknown-op.json",
+      "golden": "golden/unknown-op.json",
+      "steps": 1,
+      "ops": [
+        "move-forward"
+      ],
+      "codes": [
+        "LB-I001",
+        "LB-I001"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ast",
+      "note": "teleport 不在 op 表、repeat 是文法外的控制流卡，都报 LB-I001；move-forward 照常进 IR"
+    },
+    {
+      "name": "arity-mismatch",
+      "ast": "asts/arity-mismatch.json",
+      "golden": "golden/arity-mismatch.json",
+      "steps": 1,
+      "ops": [
+        "pick"
+      ],
+      "codes": [
+        "LB-I002",
+        "LB-I002"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ast",
+      "note": "wait 没带数字、jump 多给一个数字，都报 LB-I002；pick 照常进 IR"
+    },
+    {
+      "name": "unsupported-node",
+      "ast": "asts/unsupported-node.json",
+      "golden": "golden/unsupported-node.json",
+      "steps": 1,
+      "ops": [
+        "move-forward"
+      ],
+      "codes": [
+        "LB-I003"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ast",
+      "note": "Program.body 里出现 node=Loop（§5 的 node 是开放枚举），报 LB-I003"
+    },
+    {
+      "name": "non-literal-arg",
+      "ast": "asts/non-literal-arg.json",
+      "golden": "golden/non-literal-arg.json",
+      "steps": 0,
+      "ops": [],
+      "codes": [
+        "LB-I004"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ast",
+      "note": "参数是 node=String 的节点，取不到整数，报 LB-I004"
+    }
+  ]
+}

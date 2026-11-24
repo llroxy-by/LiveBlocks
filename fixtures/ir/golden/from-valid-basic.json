@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [
+      {
+        "step_id": "s0",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 0,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s1",
+        "op": "jump",
+        "args": {},
+        "source": {
+          "row": 2,
+          "slot": 0
+        }
+      }
+    ],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "LB-I002",
+      "severity": "error",
+      "message": "行 1 槽位 0 的命令卡 'turn-left' 期望 1 个参数，实际 2 个（docs/IR.md §2 的元数表）；该语句不进 IR，不做截断或补零",
+      "candidate_ids": [
+        "c-2"
+      ],
+      "span": {
+        "row": 1,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    }
+  ]
+}

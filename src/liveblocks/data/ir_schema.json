@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liveblocks.local/schemas/ir-0.0.1.json",
+  "title": "Ir",
+  "description": "序界（LiveBlocks）S5 规范化中间表示（docs/PROTOCOL.md §6）的 JSON Schema。只描述 §6 明写的结构 + docs/IR.md 里登记的 op 表；op 与 args 的语义对应关系（哪个 op 收哪个参数）由 validate_ir 的语义检查负责，schema 只管形状。§0 要求消费者容忍未知字段，因此各层都是 additionalProperties: true。",
+  "type": "object",
+  "required": ["schema_version", "kind", "ir_version", "program", "diagnostics"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+    "kind": { "const": "Ir" },
+    "ir_version": { "const": "0.0.1" },
+    "program": { "$ref": "#/$defs/program" },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "program": {
+      "type": "object",
+      "required": ["steps", "limits"],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "limits": { "$ref": "#/$defs/limits" }
+      },
+      "additionalProperties": true
+    },
+    "step": {
+      "type": "object",
+      "required": ["step_id", "op", "args", "source"],
+      "properties": {
+        "step_id": { "type": "string", "pattern": "^s[0-9]+$" },
+        "op": { "type": "string", "minLength": 1 },
+        "args": {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "string"] }
+        },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["row", "slot"],
+      "properties": {
+        "row": { "type": "integer", "minimum": 0 },
+        "slot": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "limits": {
+      "type": "object",
+      "required": ["max_steps", "timeout_ms"],
+      "properties": {
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": true
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^LB-[A-Z][0-9]{3}$" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "minLength": 1 },
+        "candidate_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "span": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

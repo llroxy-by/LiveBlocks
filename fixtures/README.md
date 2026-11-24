@@ -113,7 +113,44 @@ python -m liveblocks synth verify --dir fixtures/scenes
   liveblocks parse report --dir fixtures/ast
   ```
 
-## 6. 约定
+## 6. `ir/`（LB-006 规范化夹具）
+
+规范化层（LB-006）的输入是协议 §5 的 `Ast`，输出是 §6 的 `Ir`，因此夹具成对出现：
+
+```
+fixtures/ir/
+├── index.json          # 清单：每个夹具的期望 steps / ops / codes / limits 与来源
+├── asts/*.json         # 输入：§5 的 Ast 文档
+└── golden/*.json       # 期望输出：§6 的 Ir，逐字节比对
+```
+
+| 夹具 | 步数 | 诊断 | 来源 |
+| --- | --- | --- | --- |
+| `all-ops` | 8 | 无 | **手写 Ast**：覆盖 op 表全部 8 个命令卡面、元数全对 |
+| `from-valid-basic` | 2 | `LB-I002` | **真跑出来的**：`liveblocks parse ast --layout fixtures/ast/valid-basic.json`（`turn-left 2 3` 元数不符） |
+| `from-valid-empty` | 0 | 无 | 同上，空程序（`valid-empty`），`limits` 照样显式出现 |
+| `from-overlap-cards` | 0 | `LB-I002` | 同上，单张 `move-back` 没带数字卡 |
+| `unknown-op` | 1 | `LB-I001`×2 | **手写 Ast**：`teleport` 不在 op 表、`repeat` 是文法外的控制流卡 |
+| `arity-mismatch` | 1 | `LB-I002`×2 | **手写 Ast**：`wait` 没带数字、`jump` 多给一个数字 |
+| `unsupported-node` | 1 | `LB-I003` | **手写 Ast**：`Program.body` 里出现 `node: "Loop"` |
+| `non-literal-arg` | 0 | `LB-I004` | **手写 Ast**：参数是 `node: "String"` |
+
+- 三个 `from-*.json` 是**上游快照**：`tests/test_ir_fixtures.py::test_pipeline_fixtures_match_fresh_parse`
+  会用当前语法层重跑并逐字段比对 `asts/from-*.json`，LB-005 变了会立刻失败；要更新就重跑上面的
+  `parse ast --out fixtures/ir/asts/…`（再用 `ir normalize --out` 重生成 golden）。
+- 手写 Ast 夹具是同类的例外（现有 `fixtures/ast` 里凑不出「未知 op」「元数不符」这类**规范化**错误，
+  它们是合法 §5 文档，只是语义超纲）：测试会先用 `validate_ast` 校验，再断言诊断码。
+- golden 只由命令生成，**不要手改**：
+
+  ```bash
+  # 重新生成黄金快照（改 op 表 / 改 args 折法后必须重跑，并在 PR 里说明 diff）
+  liveblocks ir normalize --ast fixtures/ir/asts/all-ops.json --out fixtures/ir/golden/all-ops.json
+
+  # 跑全部夹具：两次规范化比字节、与 golden 逐字节比、schema 校验 + 验收对照（退出码 0 = 全过）
+  liveblocks ir report --dir fixtures/ir
+  ```
+
+## 7. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

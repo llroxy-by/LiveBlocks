@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "LB-I004",
+      "severity": "error",
+      "message": "行 0 槽位 0 的命令卡 'move-forward' 第 0 个参数不是字面数字卡（P0 只把 Number 折成整数参数）；该语句不进 IR",
+      "candidate_ids": [
+        "c-0"
+      ],
+      "span": {
+        "row": 0,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    }
+  ]
+}

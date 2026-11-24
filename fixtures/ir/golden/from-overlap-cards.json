@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "LB-I002",
+      "severity": "error",
+      "message": "行 0 槽位 0 的命令卡 'move-back' 期望 1 个参数，实际 0 个（docs/IR.md §2 的元数表）；该语句不进 IR，不做截断或补零",
+      "candidate_ids": [
+        "c-1"
+      ],
+      "span": {
+        "row": 0,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ast",
+  "frame_id": "f-valid-basic",
+  "grammar_version": "0.0.1",
+  "root": {
+    "node": "Program",
+    "span": {
+      "row_from": 0,
+      "row_to": 2,
+      "slot_from": 0,
+      "slot_to": 2
+    },
+    "body": [
+      {
+        "node": "Command",
+        "span": {
+          "row": 0,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "move-forward",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 0,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 1,
+            "origin": {
+              "candidate_id": "c-1",
+              "card_face": "number-1"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-0",
+          "card_face": "move-forward"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 1,
+          "slot_from": 0,
+          "slot_to": 2
+        },
+        "name": "turn-left",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 1,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 2,
+            "origin": {
+              "candidate_id": "c-3",
+              "card_face": "number-2"
+            }
+          },
+          {
+            "node": "Number",
+            "span": {
+              "row": 1,
+              "slot_from": 2,
+              "slot_to": 2
+            },
+            "value": 3,
+            "origin": {
+              "candidate_id": "c-4",
+              "card_face": "number-3"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-2",
+          "card_face": "turn-left"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 2,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "jump",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-5",
+          "card_face": "jump"
+        }
+      }
+    ],
+    "origin": {
+      "candidate_ids": [
+        "c-0",
+        "c-1",
+        "c-2",
+        "c-3",
+        "c-4",
+        "c-5"
+      ],
+      "card_faces": [
+        "move-forward",
+        "number-1",
+        "turn-left",
+        "number-2",
+        "number-3",
+        "jump"
+      ]
+    }
+  },
+  "diagnostics": []
+}

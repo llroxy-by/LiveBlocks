@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [
+      {
+        "step_id": "s0",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 0,
+          "slot": 0
+        }
+      }
+    ],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "LB-I003",
+      "severity": "error",
+      "message": "行 1 槽位 0 的语句节点是 'Loop'，本实现只把 Command 规范化成 step（§5 的 node 是开放枚举）；该语句不进 IR",
+      "candidate_ids": [
+        "c-1"
+      ],
+      "span": {
+        "row": 1,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    }
+  ]
+}

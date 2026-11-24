@@ -4,7 +4,7 @@
 
 ## 现状
 
-- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**与 **LB-005 语法解析**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片）。
+- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**、**LB-005 语法解析**与 **LB-006 规范化 IR**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片），再把 `Ast` 规范化成符合协议 §6 的 `Ir`（确定性输出、显式 `limits`、`op` 按 op 表校验，问题报 `LB-I0xx` 并通过入库 JSON Schema 校验）。
 - 仓库**还没有 IR 规范化、执行、界面**（LB-006 起），因此目前不能说「能执行」「能显示」。识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
@@ -154,6 +154,34 @@ liveblocks parse report --dir fixtures/ast
 `PROTOCOL.md` §5/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-016 与
 [docs/PROGRESS.md](docs/PROGRESS.md) §4。
 
+## 规范化 IR（LB-006）
+
+把语法树 `Ast` 折成**确定性**的中间表示 `Ir`（协议 §6）：一条 `Command` = 一步 `step`（`op` 取卡面、
+参数折成 `{"<参数名>": <整数>, "unit": "<单位>"}`、来源写 `{"row", "slot"}`、`step_id` 密集编号
+`s0`/`s1`/…），`limits` 在规范化阶段就显式写出来（缺省 `max_steps` 1000 / `timeout_ms` 5000），
+`op` 与元数按 op 表校验（未知 `op` 报 `LB-I001`、元数不符报 `LB-I002`、语句节点不受支持 `LB-I003`、
+参数不是字面量 `LB-I004`），产出的 `Ir` 通过入库的 JSON Schema 校验。**不执行**（那是 LB-007）。
+
+```bash
+# Ast JSON（协议 §5）→ Ir JSON（协议 §6）；stdout 可直接管道给下游
+liveblocks ir normalize --ast fixtures/ir/asts/all-ops.json
+
+# 显式覆盖 limits（覆盖值会写进 IR）
+liveblocks ir normalize --ast fixtures/ir/asts/all-ops.json --max-steps 50 --timeout-ms 1200
+
+# 出现 LB-I0xx 时诊断走 stderr、退出码仍为 0；加 --fail-on-error 让它变成 1
+liveblocks ir normalize --ast fixtures/ir/asts/unknown-op.json --fail-on-error
+
+# 对全部 IR 夹具跑一遍：两次规范化比字节、与 golden 逐字节比、schema 校验 + 验收对照
+liveblocks ir report --dir fixtures/ir
+```
+
+当前实测（`fixtures/ir`，8 个夹具 = 3 个上游快照 + 5 个手写）：8 份 Ir 全部通过 schema 校验与语义校验，
+两次规范化（含不同 `PYTHONHASHSEED` 的子进程）字节一致，且与入库 golden 逐字节一致；`all-ops` 覆盖
+op 表全部 8 个命令卡面（8 步、0 诊断）；4 个 `LB-I0xx` 码都有真实触发路径。IR 规范本身在
+[docs/IR.md](docs/IR.md)（草案 `ir_version` 0.0.1），取舍与 `PROTOCOL.md` §6/§9 的缺口清单见
+[docs/DECISIONS.md](docs/DECISIONS.md) D-017 与 [docs/PROGRESS.md](docs/PROGRESS.md) §4。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -162,6 +190,7 @@ liveblocks parse report --dir fixtures/ast
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | 层间数据格式（识别 / 排列 / AST / IR / 执行反馈），**草案，未冻结** | 草案 v0.0.1 |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | 待验证的硬件选型、电源与引脚待确认项、卡片制作 | 待验证 |
 | [docs/GRAMMAR.md](docs/GRAMMAR.md) | P0 文法定义（产生式、卡面角色、AST 形状、`LB-P0xx` 码表），**草案** | 草案 v0.0.1（`grammar_version` 0.0.1） |
+| [docs/IR.md](docs/IR.md) | P0 规范化 IR 规范（op 表、`args`/`limits`/`step_id` 约定、`LB-I0xx` 码表、schema），**草案** | 草案 v0.0.1（`ir_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
@@ -186,14 +215,15 @@ liveblocks parse report --dir fixtures/ast
 ├── src/liveblocks/       # 实现包
 │   ├── __init__.py
 │   ├── __main__.py       # python -m liveblocks
-│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout … / parse …
+│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout … / parse … / ir …
 │   ├── data/             # 卡片字典、ArUco 位表、版式定义、点阵字体（JSON）
 │   ├── synth/            # LB-002 合成卡片图像生成器（不做识别）
 │   ├── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
 │   ├── layout/           # LB-004 排列层（卡片候选 → Layout、自检报告）
-│   └── parser/           # LB-005 语法层（Layout → Ast、P0 文法定义与自检报告）
+│   ├── parser/           # LB-005 语法层（Layout → Ast、P0 文法定义与自检报告）
+│   └── ir/               # LB-006 规范化层（Ast → Ir、op 表、schema 校验与自检报告）
 ├── tests/                # pytest 用例，testpaths = tests
-├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）
+├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```

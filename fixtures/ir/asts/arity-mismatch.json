@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ast",
+  "frame_id": "f-ir-arity",
+  "grammar_version": "0.0.1",
+  "root": {
+    "node": "Program",
+    "span": {
+      "row_from": 0,
+      "row_to": 2,
+      "slot_from": 0,
+      "slot_to": 1
+    },
+    "body": [
+      {
+        "node": "Command",
+        "span": {
+          "row": 0,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "wait",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-0",
+          "card_face": "wait"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 1,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "jump",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 1,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 3,
+            "origin": {
+              "candidate_id": "c-2",
+              "card_face": "number-3"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-1",
+          "card_face": "jump"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 2,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "pick",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-3",
+          "card_face": "pick"
+        }
+      }
+    ],
+    "origin": {
+      "candidate_ids": [
+        "c-0",
+        "c-1",
+        "c-2",
+        "c-3"
+      ],
+      "card_faces": [
+        "wait",
+        "jump",
+        "number-3",
+        "pick"
+      ]
+    }
+  },
+  "diagnostics": []
+}

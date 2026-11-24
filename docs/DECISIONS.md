@@ -21,6 +21,7 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
 | D-014 | LB-003 状态/置信度/朝向/诊断码的定义，以及 `PROTOCOL.md` §3 的缺口清单 | 已定 | 2026-11-23 |
 | D-015 | LB-004 排列层：卡距自适应、行/列与阅读方向的关系、朝向归一、去重与诊断码，以及 `PROTOCOL.md` §4 的缺口清单 | 已定 | 2026-11-23 |
 | D-016 | LB-005 语法层：P0 文法（一行=一条语句、只收字面参数）、`span`/`origin` 约定、`LB-P0xx` 码表，以及 `PROTOCOL.md` §5/§9 的缺口清单 | 已定 | 2026-11-23 |
+| D-017 | LB-006 规范化 IR：`op` 取卡面、元数/单位表、`limits` 缺省值、`step_id` 密集编号、`LB-I0xx` 码表、入库 JSON Schema，以及 `PROTOCOL.md` §6/§9 的缺口清单 | 已定 | 2026-11-24 |
 
 ---
 
@@ -346,6 +347,84 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
 - **待办**：协议冻结前把上面 8 条并进 §5/§9（由仓库所有者决定取舍）；D-005 与 Q4（文法表达力）
   确认后，若 P0 要加表达式或控制流，必须提升 `grammar_version` 并同步扩 `docs/GRAMMAR.md`
   的产生式、卡面角色表与诊断码。
+
+## D-017 LB-006 规范化 IR：`op` 取卡面、元数表、`limits` 缺省值、`LB-I0xx` 码表与 §6 的缺口
+
+- **背景**：Issue #16 要求「AST → 确定性 IR，schema 校验，缺省值填充，`limits` 显式化」，输出符合
+  `docs/PROTOCOL.md` §6 的 `Ir`。但 §6 只有四句约定（确定性、`limits` 必须显式、`op` 只能来自文法
+  定义、未知 `op` 是规范化错误）和一个示例：**没有**说卡面怎么变成 `op`（示例写 `op: "move"`，卡面
+  却叫 `move-forward`）、每条命令收几个参数、参数与单位叫什么、`limits` 的缺省值是多少、`step_id`
+  怎么编号、`args` 是什么形状，也没给 `LB-I0xx` 的其它码（§9 只举了 `LB-I001` 一个例子），更没给
+  schema 文件（D-015/D-016 都写着「完整的 schema 工具留给 LB-006/LB-009」）。D-016 第 3 条明确把
+  arity 留给本任务。
+- **决策**（人类可读的定义见 `docs/IR.md`，机器可读的同一份在 `src/liveblocks/ir/ops.py` 与
+  `src/liveblocks/data/ir_schema.json`；`tests/test_ir_docs.py` 与 `liveblocks ir report` 逐项核对
+  两者一致）：
+  1. **`op` 直接取卡面**（`Command.name` 原样）。依据是 §6 自己那句「只允许 `op` 取值来自文法定义」，
+     而文法里的命令名就是卡面（D-016 第 2 条）。示例里的 `op: "move"` 与卡面 `move-forward` 对不上，
+     是 §6 自身的缺口：要让 `move-back` 也叫 `move` 就得替它发明「负距离」之类的语义，超出本单范围，
+     因此**不猜**，只报缺口（见下第 1 条）。`move-back` / `turn-left` 等方向信息留在 `op` 里。
+  2. **元数（arity）与参数名/单位按「卡面上写的意思」取最小集**：`move-forward` / `move-back` 收
+     1 个 `distance`（单位 `cell`，§6 示例用的就是这个单位）、`turn-left` / `turn-right` 收 1 个
+     `angle`（单位 `quarter_turn`）、`wait` 收 1 个 `duration`（单位 `tick`）、`jump` / `pick` /
+     `drop` 不收参数。P0 每个 `op` 至多一个数值参数，因此 `args` 的形状固定为
+     `{"<参数名>": <整数>, "unit": "<单位>"}`，零元 `op` 用空对象 `{}`（对齐 §6 示例的
+     `{"distance": 1, "unit": "cell"}`）。单位只是标签，物理换算（尤其 `tick` ↔ 毫秒）属于 LB-007 / Q5。
+  3. **参数个数不符是规范化错误**：`LB-I002`，该语句不进 IR，**不截断、不补零、不猜默认参数**——
+     这正是 D-016 第 3 条把 arity 推给本任务时要的结论。**这条规则会让真实链路的某些 P0 程序降级**：
+     `fixtures/ast` 的 `valid-basic`（`turn-left 2 3`）与 `from-overlap-cards`（单张 `move-back` 没带
+     数字卡）在 IR 阶段各报一条 `LB-I002`。这是如实结果，不是 bug：语法层不管 arity，IR 才管。
+  4. **`op` 表从卡片字典推导 + 显式登记元数**：op 表必须覆盖字典里全部 `command` 角色卡面，
+     `op_table_gaps()` 会把「字典有、表里没有」与「表里有、字典没有」都报出来；字典新增一张 action 卡
+     后必须回来扩表（元数不能猜），否则 `ir report` 与测试失败。
+  5. **`limits` 在规范化阶段就填**（范围项要求「显式化」），缺省值取 §6 示例的
+     `max_steps = 1000` / `timeout_ms = 5000`；两者必须是 ≥ 1 的整数（0 / 负数算配置错误，抛
+     `ValueError`）。可用 API 参数或 CLI `--max-steps` / `--timeout-ms` 覆盖，覆盖值照样写进 IR。
+     **「步数超限 / 超时」不在本层判定**：那是执行层的 `ExecResult.status = limit_exceeded/timeout`
+     （§7.2，LB-007）。
+  6. **`step_id` 密集编号**：`s0` / `s1` / …，按**产出的**步骤顺序（与 D-015 起强制的 `row_index` /
+     `slot_index` 连续口径一致）。被丢弃的语句不占编号，诊断里的 `span` 指回原行/原槽位。
+  7. **`source` 照 §6 示例写 `{"row", "slot"}`**，取 `Command.span` 的起始行与起始槽位；不加
+     `candidate_id` 之类的加法式字段（保守，且诊断的 `candidate_ids` 已经能逐卡回溯）。
+  8. **诊断码（§9 的 `LB-I0xx` 区间）**：`LB-I001` 未知 op（沿用 §9 示例语义，含文法外的控制流卡
+     `repeat` / `if` / `end`）、`LB-I002` 参数个数不符、`LB-I003` 语句节点不受支持（§5 的 `node`
+     是开放枚举）、`LB-I004` 参数不是字面量（取不到整数）。`severity` 一律 `error`，每条带 `span`
+     与 `candidate_ids`。**一条语句最多一条诊断**，检查顺序固定（节点种类 → op → 参数 → 元数），
+     不做级联。**输入本身不是合法 §5 文档时抛 `ValueError`**（CLI 非零退出），不伪装成 `LB-I0xx`。
+  9. **不复制上游诊断**：`Ast.diagnostics`（`LB-P0xx`）留在语法层，`Ir.diagnostics` 只有 `LB-I0xx`。
+  10. **schema 入库**：`src/liveblocks/data/ir_schema.json`（JSON Schema draft 2020-12，随 wheel 安装，
+      `liveblocks.data` 的 `*.json` 已在 `pyproject.toml` 里声明），配一个零依赖的最小校验器
+      （只支持 schema 用到的那一小撮关键字，schema 里出现不支持的关键字测试就失败）；schema 表达不了
+      的语义检查（op↔args、`step_id` 密集、诊断码区间）放在 `validate_ir`。装得上 `jsonschema` 时
+      `tests/test_ir_protocol.py` 用它当独立实现交叉核对，CI 只装 `.[dev]` 时该例自动跳过。
+  11. **确定性**：所有对象按固定顺序构造、序列化只走 `Ir.canonical_text()`
+      （`ensure_ascii=False`、`indent=2`、不排序键、结尾一个换行），数值只有整数、无时间戳/随机量，
+      诊断顺序 = 语句顺序。验收用三重证据：同进程两次相等、不同 `PYTHONHASHSEED` 的子进程输出相等、
+      与入库 golden 逐字节相等。
+- **影响**：
+  - IR 只吃 §5 的字段（`name` / `args[].value` / `span` / `origin`），因此夹具可以是手写的 Ast JSON
+    （`fixtures/ir/asts/`）；三个上游快照夹具另有测试保证与 LB-005 一致。
+  - 因为 arity 变严，真实链路上「只放了一张命令卡、没放数字卡」的程序会在 IR 阶段被点名（`LB-I002`），
+    而不是带着空参数流到执行层——这符合「只允许 `op` 取值来自文法定义 + `limits` 是硬约束」的初衷，
+    代价是 P0 卡片语法能表达但语义不成立的程序会被降级为空程序（原 `Layout`/`Ast` 仍在运行记录里）。
+  - `op` = 卡面意味着将来若要引入「卡面 → op 动词」映射（例如统一成 `move` + 方向参数），
+    必须提升 `ir_version` 并重生成全部 golden（这是一次破坏性变更，按 §10 规则 2 处理）。
+- **发现的协议缺口（本 PR 只报告、不改 `docs/PROTOCOL.md`）**：
+  1. **§6 示例的 `op` 与卡面对不上**（`move` vs `move-forward`），且没说卡面到 op 的映射规则；
+     本实现 `op` = 卡面，示例按示意处理；
+  2. §6 的 `Ir` **没有指回上游的字段**（无 `frame_id` / 语法树引用 / 卡片 id），只有 `source.row/slot`；
+     本实现不加（保守），跨层关联靠 §8 的 `RunHeader` 与诊断的 `candidate_ids`；
+  3. §6 **没有定义 `args` 的形状**（只给了一个 op 的示例），也没定义元数；本实现固定「至多一个数值
+     参数 + `unit`」，并把元数表当作 P0 的 IR 语义（建议并入协议）；
+  4. §6 说 `limits` 缺省「由运行时补齐」，但没给数值也没说谁来填；本实现在规范化阶段填 1000 / 5000，
+     需要协议确认这两个缺省值；
+  5. §9 只给了 `LB-I001` 一个示例，`LB-I002`…`LB-I004` 由本实现按 `LB-I0xx` 区间自增；
+  6. §5/§6 **没有说未知语句节点怎么办**（§5 只说 `node` 是开放枚举）；本实现报 `LB-I003` 并跳过；
+  7. **没有 schema 文件与 schema 版本线**：本单补了 `ir_schema.json`，但它与 `schema_version` /
+     `ir_version` 的关系协议没写（本实现把 schema 的 `$id` 标成 `ir-0.0.1`，随 `ir_version` 走）；
+  8. `tick` / `cell` / `quarter_turn` 的物理含义与换算没有出处（Q5 未定），本实现只当标签写进 `args.unit`。
+- **待办**：协议冻结前把上面 8 条并进 §6/§9（由仓库所有者决定取舍）；Q5（语义模型）定了之后，
+  若把 IR 改成表达式求值图，需要提升 `ir_version` 并重写 `docs/IR.md` 的 op 表与 `args` 形状。
 
 ## 待决问题索引（对应 `docs/ARCHITECTURE.md` §4）
 
