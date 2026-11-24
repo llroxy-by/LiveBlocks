@@ -1,0 +1,1 @@
+{"schema_version": "0.0.1", "kind": "ExecEvent", "run_id": "run-from-valid-empty", "seq": 1, "at_ms": 0.0, "step_id": "", "phase": "log", "backend": "sim", "detail": {"message": "run started", "steps": 0, "limits": {"max_steps": 1000, "timeout_ms": 5000}, "backend": "sim", "clock_ms_per_tick": 10.0}}

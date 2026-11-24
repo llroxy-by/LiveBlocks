@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecState",
+  "exec_version": "0.0.1",
+  "run_id": "run-abort",
+  "backend": "sim",
+  "status": "aborted",
+  "steps_executed": 3,
+  "duration_ms": 60.0,
+  "limits": {
+    "max_steps": 1000,
+    "timeout_ms": 5000
+  },
+  "world": {
+    "pos": {
+      "x": 0,
+      "y": 3
+    },
+    "facing": "north",
+    "holding": 0,
+    "jumps": 0
+  },
+  "events": 8,
+  "last_seq": 8
+}

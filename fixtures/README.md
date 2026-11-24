@@ -150,7 +150,52 @@ fixtures/ir/
   liveblocks ir report --dir fixtures/ir
   ```
 
-## 7. 约定
+## 7. `exec/`（LB-007 执行夹具）
+
+执行层（LB-007）的输入是协议 §6 的 `Ir`，输出是事件流（§7.1，JSONL）与最终状态（本层加法式的
+`ExecState`，JSON），因此夹具是三件套：
+
+```
+fixtures/exec/
+├── index.json          # 清单：每个夹具的期望 status / 步数 / 事件条数 / 诊断码 / limits / 中断点
+├── ir/*.json           # 输入：手写的合法 §6 Ir（其余夹具直接引用 ../ir/golden/ 的上游 golden）
+├── events/*.jsonl      # 期望输出：ExecEvent 事件流，一行一个事件
+└── state/*.json        # 期望输出：ExecState 最终状态
+```
+
+| 夹具 | `status` | 步数 | 事件 | 诊断 | 来源 |
+| --- | --- | --- | --- | --- | --- |
+| `all-ops` | ok | 8 | 17 | 无 | **上游 golden**：`../ir/golden/all-ops.json`，覆盖全部 8 个 op |
+| `from-valid-basic` | ok | 2 | 5 | 无 | **上游 golden**：真实链路（`move-forward 1` + `jump`） |
+| `from-valid-empty` | ok | 0 | 1 | 无 | **上游 golden**：空程序（0 步，只有起步 `log` 事件） |
+| `non-terminating-steps` | limit_exceeded | 10 | 22 | `LB-R002` | **手写 Ir**：40 步直线行走 + `max_steps=10` |
+| `non-terminating-wait` | timeout | 1 | 4 | `LB-R003` | **手写 Ir**：`wait 5` + `wait 500` + `timeout_ms=1000` |
+| `drop-empty` | runtime_error | 2 | 7 | `LB-R005` | **手写 Ir**：`pick`、`drop`、`drop`（第二次空手） |
+| `abort` | aborted | 3 | 8 | `LB-R004` | **手写 Ir**：6 步行走，清单声明 `abort_at_step: 3` |
+| `timeout-exact` | ok | 1 | 3 | 无 | **手写 Ir**：`wait 100` = 1000 ms 恰好等于 `timeout_ms` |
+
+- 三个上游 golden 夹具是**真实链路快照**（`../ir/golden/*.json` 由 LB-006 生成）；手写 Ir 夹具是同类
+  例外（现有 golden 里凑不出「步数用尽」「超时」「空手 drop」「中断」这些**执行期**形态），它们都是
+  合法 §6 文档，测试会先用 `validate_ir` 校验再断言结果。
+- **P0 的 IR 没有控制流**（D-016 第 1 条），所以「死循环」在夹具里用两种等价形态表示：
+  步骤无限长（`non-terminating-steps`）与一次 `wait` 吃光虚拟时间预算（`non-terminating-wait`）。
+  两者都由 `limits` 兜住，实测都在 1 ms 内结束，不会挂死。
+- golden 只由命令生成，**不要手改**：
+
+  ```bash
+  # 重新生成某个夹具的 golden（改语义表 / 时钟换算后必须重跑，并在 PR 里说明 diff）
+  liveblocks exec run --ir fixtures/ir/golden/all-ops.json \
+    --events-out fixtures/exec/events/all-ops.jsonl --state-out fixtures/exec/state/all-ops.json
+
+  # 中断夹具要带上清单里的 --abort-at-step
+  liveblocks exec run --ir fixtures/exec/ir/abort.json --abort-at-step 3 \
+    --events-out fixtures/exec/events/abort.jsonl --state-out fixtures/exec/state/abort.json
+
+  # 跑全部夹具：逐条结果 + 八条验收对照 + 实测耗时（退出码 0 = 全过）
+  liveblocks exec report --dir fixtures/exec
+  ```
+
+## 8. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

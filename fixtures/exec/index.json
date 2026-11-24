@@ -1,0 +1,145 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecFixtureIndex",
+  "exec_version": "0.0.1",
+  "note": "LB-007 的执行夹具清单：每项是一份合法的 Ir（协议 §6）+ 该 IR 用模拟后端执行后的 golden 事件流（JSONL，协议 §7.1）与 golden 最终状态（JSON，本层加法式的 ExecState）。status / steps / events_count / codes / limits / abort_at_step 是期望值；golden 由 liveblocks exec run --ir <ir> --events-out <events> --state-out <state> 生成（中断夹具另加 --abort-at-step），逐字节比对。P0 的 IR 没有控制流，所以「非终止」用两种等价形态：步骤无限长（non-terminating-steps）与一次 wait 吃光时间预算（non-terminating-wait）。",
+  "fixtures": [
+    {
+      "name": "all-ops",
+      "ir": "../ir/golden/all-ops.json",
+      "events": "events/all-ops.jsonl",
+      "state": "state/all-ops.json",
+      "status": "ok",
+      "steps": 8,
+      "events_count": 17,
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "LB-006 的 golden Ir（fixtures/ir/golden/all-ops.json）",
+      "note": "覆盖执行语义表全部 8 个 op：8 步全跑完、事件 1+2×8=17 条、虚拟耗时 140 ms"
+    },
+    {
+      "name": "from-valid-basic",
+      "ir": "../ir/golden/from-valid-basic.json",
+      "events": "events/from-valid-basic.jsonl",
+      "state": "state/from-valid-basic.json",
+      "status": "ok",
+      "steps": 2,
+      "events_count": 5,
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "LB-005/LB-006 真实链路的 golden Ir（move-forward 1 + jump）",
+      "note": "真实链路样例：IR 里还留着上游的 LB-I002 诊断，执行层不复制它（各层诊断留在各层）"
+    },
+    {
+      "name": "from-valid-empty",
+      "ir": "../ir/golden/from-valid-empty.json",
+      "events": "events/from-valid-empty.jsonl",
+      "state": "state/from-valid-empty.json",
+      "status": "ok",
+      "steps": 0,
+      "events_count": 1,
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "LB-006 的 golden Ir（空程序）",
+      "note": "空程序：0 步、只有起步 log 事件，limits 仍然显式回显"
+    },
+    {
+      "name": "non-terminating-steps",
+      "ir": "ir/non-terminating-steps.json",
+      "events": "events/non-terminating-steps.jsonl",
+      "state": "state/non-terminating-steps.json",
+      "status": "limit_exceeded",
+      "steps": 10,
+      "events_count": 22,
+      "codes": [
+        "LB-R002"
+      ],
+      "limits": {
+        "max_steps": 10,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ir（40 步直线行走，limits.max_steps=10）",
+      "note": "非终止形态 A：P0 IR 没有循环，用「很长的同一步序列」表示死循环；max_steps 兜住，不会挂死"
+    },
+    {
+      "name": "non-terminating-wait",
+      "ir": "ir/non-terminating-wait.json",
+      "events": "events/non-terminating-wait.jsonl",
+      "state": "state/non-terminating-wait.json",
+      "status": "timeout",
+      "steps": 1,
+      "events_count": 4,
+      "codes": [
+        "LB-R003"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 1000
+      },
+      "source": "手写 Ir（wait 5 + wait 500，limits.timeout_ms=1000）",
+      "note": "非终止形态 B：一次 wait 就吃光虚拟时间预算；虚拟时钟不睡真实时间，因此毫秒级收尾"
+    },
+    {
+      "name": "drop-empty",
+      "ir": "ir/drop-empty.json",
+      "events": "events/drop-empty.jsonl",
+      "state": "state/drop-empty.json",
+      "status": "runtime_error",
+      "steps": 2,
+      "events_count": 7,
+      "codes": [
+        "LB-R005"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "source": "手写 Ir（pick、drop、drop）",
+      "note": "运行时语义检查：第二次 drop 时手上是空的，报 LB-R005 并以 runtime_error 结束（不崩、不挂）"
+    },
+    {
+      "name": "abort",
+      "ir": "ir/abort.json",
+      "events": "events/abort.jsonl",
+      "state": "state/abort.json",
+      "status": "aborted",
+      "steps": 3,
+      "events_count": 8,
+      "codes": [
+        "LB-R004"
+      ],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 5000
+      },
+      "abort_at_step": 3,
+      "source": "手写 Ir（6 步 move-forward 1），清单声明在执行第 3 步之前中断",
+      "note": "中断验收：--abort-at-step 3 → 只跑完 3 步，事件 1+2×3+1=8 条，status=aborted"
+    },
+    {
+      "name": "timeout-exact",
+      "ir": "ir/timeout-exact.json",
+      "events": "events/timeout-exact.jsonl",
+      "state": "state/timeout-exact.json",
+      "status": "ok",
+      "steps": 1,
+      "events_count": 3,
+      "codes": [],
+      "limits": {
+        "max_steps": 1000,
+        "timeout_ms": 1000
+      },
+      "source": "手写 Ir（wait 100 = 1000 ms，limits.timeout_ms=1000）",
+      "note": "边界：虚拟耗时恰好等于 timeout_ms 且程序跑完 → ok，不是 timeout（防止「恰好用满」被误判）"
+    }
+  ]
+}

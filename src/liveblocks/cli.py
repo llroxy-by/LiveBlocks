@@ -23,6 +23,11 @@
   - ``liveblocks ir normalize --ast <json>``   ``Ast`` → 符合 §6 的 ``Ir``（确定性、显式 ``limits``）
   - ``liveblocks ir report``                   对 ``fixtures/ir`` 跑规范化并与 golden 快照比对
 
+- LB-007：``exec`` 子命令组（模拟后端，``backend: "sim"``）：
+
+  - ``liveblocks exec run --ir <json>``   ``Ir`` → 事件流（§7.1）+ ``ExecResult``（§7.2）+ 最终状态 JSON
+  - ``liveblocks exec report``            对 ``fixtures/exec`` 真跑一遍并打印验收对照（含实测耗时）
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -46,6 +51,8 @@ DEFAULT_LAYOUT_DIR = Path("fixtures/layouts")
 DEFAULT_AST_DIR = Path("fixtures/ast")
 #: LB-006 的 IR 夹具目录（``Ast`` JSON + golden ``Ir`` + 清单，见 ``fixtures/README.md`` §6）。
 DEFAULT_IR_DIR = Path("fixtures/ir")
+#: LB-007 的执行夹具目录（``Ir`` JSON + golden 事件流/最终状态 + 清单，见 ``fixtures/README.md`` §7）。
+DEFAULT_EXEC_DIR = Path("fixtures/exec")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -250,6 +257,57 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ir_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     ir_report.set_defaults(handler=_cmd_ir_report)
+
+    execute = subparsers.add_parser(
+        "exec",
+        help="模拟执行层（LB-007）：Ir → 事件流 + ExecResult",
+        description=(
+            "用模拟后端执行协议 §6 的 Ir：虚拟时钟、来自 Ir.limits 的步数/超时限制、步骤边界中断；"
+            "事件一律标 backend=sim。不接硬件、不做界面。"
+        ),
+    )
+    exec_sub = execute.add_subparsers(dest="exec_command", required=True)
+
+    exec_run = exec_sub.add_parser(
+        "run", help="执行一份 Ir JSON，打印摘要 + 最终状态 JSON（可另存事件流与结果）"
+    )
+    exec_run.add_argument("--ir", type=Path, required=True, help="输入 Ir JSON（协议 §6）")
+    exec_run.add_argument("--run-id", default=None, help="运行标识（默认 run-<文件名主干>）")
+    exec_run.add_argument(
+        "--events-out",
+        type=Path,
+        default=None,
+        help="把事件流按 §8 风格写成 JSONL（一行一个 ExecEvent）",
+    )
+    exec_run.add_argument("--result-out", type=Path, default=None, help="把 ExecResult 写成 JSON")
+    exec_run.add_argument(
+        "--state-out",
+        type=Path,
+        default=None,
+        help="把最终状态（ExecState）写成 JSON；不给则打印到标准输出",
+    )
+    exec_run.add_argument(
+        "--abort-at-step",
+        type=int,
+        default=None,
+        help="执行到第 N 步之前中断（确定性中断，验收「中断」用）",
+    )
+    exec_run.add_argument(
+        "--abort-at-ms",
+        type=float,
+        default=None,
+        help="虚拟时钟走到 N 毫秒后、下一步之前中断",
+    )
+    exec_run.set_defaults(handler=_cmd_exec_run)
+
+    exec_report = exec_sub.add_parser(
+        "report", help="对执行夹具目录真跑一遍，打印逐条结果、验收对照与实测耗时"
+    )
+    exec_report.add_argument(
+        "--dir", type=Path, default=DEFAULT_EXEC_DIR, help="执行夹具目录（默认 fixtures/exec）"
+    )
+    exec_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    exec_report.set_defaults(handler=_cmd_exec_report)
 
     return parser
 
@@ -650,6 +708,100 @@ def _cmd_ir_report(args: argparse.Namespace) -> int:
     report = build_report(args.dir)
     if not report.fixtures:
         print(f"{args.dir} 里没有 IR 夹具（或清单缺失）")
+        if report.manifest_error:
+            print(f"清单问题：{report.manifest_error}")
+        return 1
+    print(format_report(report), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _exec_abort_hook(args: argparse.Namespace):
+    """把 ``--abort-at-step`` / ``--abort-at-ms`` 折成一个「步骤边界中断」回调。"""
+    step_limit = args.abort_at_step
+    ms_limit = args.abort_at_ms
+    if step_limit is None and ms_limit is None:
+        return None
+
+    def should_abort(step_index: int, elapsed_ms: float) -> bool:
+        if step_limit is not None and step_index >= step_limit:
+            return True
+        if ms_limit is not None and elapsed_ms >= ms_limit:
+            return True
+        return False
+
+    return should_abort
+
+
+def _cmd_exec_run(args: argparse.Namespace) -> int:
+    import json
+
+    from .runtime import SimExecutor, canonical_text, ir_from_document, validate_run
+
+    if not args.ir.is_file():
+        raise SystemExit(f"找不到 Ir 文件：{args.ir}")
+    try:
+        document = json.loads(args.ir.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"{args.ir} 不是合法 JSON：{error}") from error
+    if not isinstance(document, dict) or document.get("kind") != "Ir":
+        kind = document.get("kind") if isinstance(document, dict) else type(document).__name__
+        raise SystemExit(f"{args.ir} 的 kind 是 {kind!r}，这里需要 Ir（协议 §6）")
+    try:
+        ir = ir_from_document(document)
+    except ValueError as error:
+        raise SystemExit(f"{args.ir} 不是合法的 Ir：{error}") from error
+
+    run_id = args.run_id or f"run-{args.ir.stem}"
+    executor = SimExecutor(run_id=run_id, should_abort=_exec_abort_hook(args))
+    run = executor.run(ir)
+    try:
+        validate_run(run)
+    except ValueError as error:
+        raise SystemExit(f"执行产出的文档不合法（这是实现缺陷，请报 Issue）：{error}") from error
+
+    if args.events_out is not None:
+        args.events_out.parent.mkdir(parents=True, exist_ok=True)
+        args.events_out.write_text(run.events_text(), encoding="utf-8")
+    if args.result_out is not None:
+        args.result_out.parent.mkdir(parents=True, exist_ok=True)
+        args.result_out.write_text(run.result_text(), encoding="utf-8")
+
+    limits = run.state["limits"]
+    print(
+        f"运行 {run_id}：{run.status}（backend=sim，步骤 {run.steps_executed}/{limits['max_steps']}，"
+        f"虚拟耗时 {run.duration_ms:g} ms / {limits['timeout_ms']} ms，事件 {len(run.events)} 条，"
+        f"实测 {run.wall_ms:.2f} ms）"
+    )
+    for entry in run.result["diagnostics"]:
+        print(f"  {entry['code']} {entry['severity']}: {entry['message']}", file=sys.stderr)
+    if args.events_out is not None:
+        print(f"事件流已写入 {args.events_out}（JSONL，{len(run.events)} 行）")
+    if args.result_out is not None:
+        print(f"ExecResult 已写入 {args.result_out}")
+    if args.state_out is not None:
+        args.state_out.parent.mkdir(parents=True, exist_ok=True)
+        args.state_out.write_text(canonical_text(run.state), encoding="utf-8")
+        print(f"最终状态已写入 {args.state_out}")
+    else:
+        print("最终状态 JSON（ExecState）：")
+        print(canonical_text(run.state), end="")
+    return 0 if run.status == "ok" else 1
+
+
+def _cmd_exec_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .runtime import build_report, format_report
+
+    report = build_report(args.dir)
+    if not report.fixtures:
+        print(f"{args.dir} 里没有执行夹具（或清单缺失）")
         if report.manifest_error:
             print(f"清单问题：{report.manifest_error}")
         return 1

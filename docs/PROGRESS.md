@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-006 规范化层：`Ast` → `Ir` + op 表 / schema 校验 / golden 快照，PR 见本仓库 `agent/lb-ir-*` 分支）
+> 最近更新：2026-11-24（LB-007 模拟执行层：`Ir` → `ExecEvent[]` + `ExecResult` + `ExecState`，虚拟时钟 / limits / 中断，PR 见本仓库 `agent/lb-sim-executor-*` 分支）
 
 ## 1. 已验证
 
@@ -68,15 +68,26 @@
 | LB-006 op 表 / 元数表与文档一致，且四个 `LB-I0xx` 码都有真实触发路径 | `src/liveblocks/ir/ops.py::op_table_gaps` 核对 op 表覆盖卡片字典里全部 `command` 角色卡面（`ir report` 打印「op 表缺口 0 项」）；`ir_document_gaps` 逐行核对 `docs/IR.md` 的 op 表（卡面/op/参数/元数/单位）、诊断码标题、`limits` 缺省值与 schema 文件名（`ir report` 打印「文档缺口 0 项」）；`tests/test_ir_docs.py`（19 例）含 5 类**反向验证**（删掉一行 op 表 / 一个诊断码标题 / 一个 `limits` 缺省值 / schema 引用 / `step_id` 说明后必须报缺口，另两类用 monkeypatch 验证 op 表多一张卡、少一张卡都会报缺口）；`tests/test_ir_normalize.py::test_every_ir_code_is_reachable` 断言 `LB-I001`…`LB-I004` 全部有触发路径，`tests/test_ir_fixtures.py::test_every_ir_code_appears_in_some_fixture` 断言四个码都在夹具里出现过 | LB-006 PR |
 | LB-006 规范化层测试与本地检查 | `PYTHON=/tmp/lb-venv-ir-ci/bin/python bash scripts/check.sh`（等价 CI 环境：只装 `.[dev]`）→ `compileall` 通过、`531 passed, 3 skipped in 78.79s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2；跳过的 3 项是只有装 OpenCV 才跑的两条交叉核对与本单新增的 jsonschema 交叉核对）；另在装了 `jsonschema` 的本地 venv 里 `python -m pytest tests/test_ir_protocol.py` → `46 passed`（0 skipped，交叉核对真的跑了）；其中新增规范化层 160 例：`tests/test_ir_protocol.py` 46、`tests/test_ir_normalize.py` 32、`tests/test_ir_fixtures.py` 48、`tests/test_ir_cli.py` 15、`tests/test_ir_docs.py` 19（其中 1 例是 jsonschema 交叉核对，未装 jsonschema 时 skip） | LB-006 PR |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，以及 **LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照；仍未包含**执行与界面**（LB-007 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
+| LB-007 模拟执行层：`Ir`（§6）→ `ExecEvent[]`（§7.1）+ `ExecResult`（§7.2）+ `ExecState`（本层加法式最终状态），虚拟时钟、来自 IR 的步数/超时限制、步骤边界中断 | 实现见 `src/liveblocks/runtime/`（`semantics.py` 执行语义表 + 时钟换算 + `LB-R0xx` 码表与文档核对、`protocol.py` §7 文档模型与校验、`sim.py` `SimExecutor`、`report.py` 自检报告）；`python -m liveblocks exec run --ir fixtures/ir/golden/all-ops.json` 打印摘要 + 最终状态 JSON，`python -m liveblocks exec report --dir fixtures/exec` 打印 8 个夹具逐条结果与 8 条验收对照，退出码 0 | LB-007 PR |
+| LB-007 样例 IR 执行后事件 `seq` 严格递增且 `backend:"sim"` | `liveblocks exec report --dir fixtures/exec` 第一条验收「事件 seq 严格递增且 backend: "sim"：通过」，依据「8 个夹具的事件流全部 seq 严格递增、backend=sim，共 67 条事件」；`tests/test_exec_fixtures.py::test_fixture_matches_its_declared_outcome`（8 例参数化）逐夹具断言 seq 与 backend；`tests/test_exec_sim.py::test_event_stream_is_start_finish_pairs_with_rising_seq` 断言 `1+2n` 条事件、`start`/`finish` 成对、`at_ms` 单调不减 | LB-007 PR |
+| LB-007 死循环（P0 等价形态）样例以 `limit_exceeded`/`timeout` 结束而非挂死 | 第二条验收「非终止样例以 limit_exceeded / timeout 结束而非挂死：通过」，依据「non-terminating-steps→limit_exceeded（实测 0.09 ms）、non-terminating-wait→timeout（实测 0.04 ms）」；`liveblocks exec run --ir fixtures/exec/ir/non-terminating-steps.json` → `limit_exceeded`（10/10 步、事件 22 条、`LB-R002`），`--ir fixtures/exec/ir/non-terminating-wait.json` → `timeout`（1 步、事件 4 条、虚拟时钟停在 1000 ms、`LB-R003`）；`tests/test_exec_sim.py::test_virtual_wait_does_not_sleep_wall_clock`（`wait 100000` = 1 000 000 虚拟毫秒，墙钟 < 500 ms） | LB-007 PR |
+| LB-007 测试总耗时在设定上限内 | 第三条验收「测试总耗时在设定上限内（虚拟时钟不睡真实时间）：通过」，依据「全部 8 个夹具真跑一遍共 8.98 ms（单夹具上限 250 ms，整份报告上限 3000 ms）」；`tests/test_exec_fixtures.py::test_report_acceptance_passes_and_stays_within_the_time_bound`（整份报告 < 3000 ms、单夹具 < 250 ms）、`tests/test_exec_sim.py::test_many_steps_stay_fast`（1000 步 < 500 ms） | LB-007 PR |
+| LB-007 带一个可读的状态输出（最终状态 JSON） | 每个夹具都有一份 `fixtures/exec/state/*.json`（`kind: ExecState`：`status` / `world{pos,facing,holding,jumps}` / 回显的 `limits` / `events` / `last_seq`），`exec run` 默认打印、`--state-out` 落盘；第四条验收「带一个可读的状态输出（最终状态 JSON）：通过」；`tests/test_exec_cli.py::test_exec_run_prints_summary_and_final_state`、`tests/test_exec_protocol.py::test_exec_state_is_readable_and_complete` | LB-007 PR |
+| LB-007 中断（步骤边界、可跨线程） | 夹具 `abort`（`abort_at_step: 3`）→ `aborted`、只跑完 3 步、事件 8 条、`LB-R004`；第六条验收「中断在步骤边界生效并以 aborted 结束：通过」；`tests/test_exec_sim.py::test_abort_hook_stops_before_the_step`、`test_abort_at_the_first_boundary_executes_nothing`、`test_request_abort_is_honoured_from_a_should_abort_callback`、`test_request_abort_works_across_threads`（另一个线程置标志，结果确定）、`test_clear_abort_lets_the_executor_run_again`、`tests/test_exec_cli.py::test_exec_run_abort_flags`（`--abort-at-step 3` 与 `--abort-at-ms 40` 都 → `aborted`） | LB-007 PR |
+| LB-007 limits 来自 IR 且边界口径明确 | 第五条验收「执行限制来自 IR（limits 显式回显）：通过」（起步 `log` 事件、`ExecResult`、`ExecState` 三处一致）；边界：`fixtures/exec/ir/timeout-exact.json`（虚拟耗时恰好 1000 ms = `timeout_ms` → `ok`）、`tests/test_exec_sim.py::test_exact_step_budget_is_ok`（步数恰好用满 → `ok`）与 `test_step_limit_is_enforced_and_leaves_a_diagnostic`（超一步 → `limit_exceeded`） | LB-007 PR |
+| LB-007 事件流与最终状态确定性（golden 快照） | 8 个夹具的事件流（JSONL）与最终状态（JSON）与入库 golden 逐字节一致；第八条验收「事件流与最终状态是确定性的（golden 快照一致）：通过」；`tests/test_exec_fixtures.py::test_fixture_goldens_are_byte_identical`（8 例参数化）、`test_report_detects_a_broken_golden`（把 golden 改一个 `seq` 后报告必须判失败，反证不是假通过）、`tests/test_exec_sim.py::test_two_runs_are_byte_identical` | LB-007 PR |
+| LB-007 模拟事件不冒充硬件证据 | `runtime.sim.validate_run()` 断言事件流 / `ExecResult` / `ExecState` 的 `backend` 全为 `sim`，出现 `hw` 即判实现缺陷；`tests/test_exec_sim.py::test_validate_run_catches_a_broken_stream`、`tests/test_exec_protocol.py::test_event_stream_rejects_mixed_backends`；`docs/EXEC.md` 首段与 §0 明写「模拟通过 ≠ 硬件验证」 | LB-007 PR |
+| LB-007 执行层文档与实现一致 | `docs/EXEC.md`（草案 `exec_version` 0.0.1：语义表、时钟换算、limits 判定顺序、中断、`LB-R0xx` 码表、`ExecState`、8 条协议缺口）；`runtime_document_gaps` 对入库文档返回 0 项缺口，`exec report` 打印「执行层文档缺口 0 项」；`tests/test_exec_docs.py`（21 例，含「文档命令块里的 `--ir`/`--dir` 路径真实存在」两条）含 8 类**反向验证**（删一行语义表 / 改耗时列 / 改状态影响 / 删一个诊断码 / 改码标题 / 改时钟换算 / 删枚举取值后必须报缺口） | LB-007 PR |
+| LB-007 执行层测试与本地检查 | `bash scripts/check.sh` → `collected 685 items / 1 skipped`、`684 passed, 2 skipped in 77.89s`（本 commit 上另一次运行为 78.37s）、`==> 检查通过`，退出码 0；新增执行层 152 例：`tests/test_exec_protocol.py` 49、`tests/test_exec_sim.py` 31、`tests/test_exec_fixtures.py` 38、`tests/test_exec_cli.py` 13、`tests/test_exec_docs.py` 21；跳过的 2 项与 LB-002/LB-003 相同（只有装 OpenCV 才跑的交叉核对） | LB-007 PR |
+
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，以及 **LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim）；仍未包含**界面与运行记录**（LB-008 / LB-009 起），也没有任何真实摄像头 / 实体卡片 / 硬件的证据（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 / LB-005 / LB-006 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块、排列层、语法层与规范化层，没有执行器与界面）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-007 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库里已有骨架、合成卡片生成器、识别模块、排列层、语法层、规范化层与**模拟**执行器，但还没有调试界面与运行记录）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-007 | 模拟执行器 | 计划中 |
 | LB-008 | 调试界面（分层可视化） | 计划中 |
 | LB-009 | 端到端回归与运行记录 | 计划中 |
 | LB-021 | 交付与打包 | 计划中（依赖 LB-020） |
@@ -100,7 +111,15 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有执行器与界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层与 LB-006 规范化层（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收与 8 个 IR 夹具的 golden 快照验收），但**没有执行器与调试界面**，因此任何「能执行」「能显示」的说法目前都不成立；IR 只是**执行计划**，还没有任何后端跑过它（LB-007 起）。
+- **还没有调试界面与运行记录**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层、LB-006 规范化层与 LB-007 模拟执行器（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收、8 个 IR 夹具的 golden 快照验收与 8 个执行夹具的事件流/最终状态验收），但**没有调试界面（LB-008）与 JSONL 运行记录（LB-009）**，所以「能显示」「有完整运行记录」目前都不成立；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013）。
+- **LB-007 已知限制（详见 `docs/DECISIONS.md` D-018 与 `docs/EXEC.md`）**：
+  1. **虚拟时钟不睡真实时间**：`duration_ms` / `at_ms` 是虚拟耗时（1 tick = 10 ms），**不是性能数据**；真实耗时只有报告里的 `SimRun.wall_ms`，不能拿「模拟很快」推出「真机很快」；
+  2. **P0 的 IR 没有控制流**（D-016 第 1 条），所以验收里的「死循环样例」只能用两种**等价运行形态**表示——步骤数超过 `max_steps`、虚拟耗时超过 `timeout_ms`；本层没有、也不该有「真的循环执行」；
+  3. **世界状态是 P0 占位语义**（`pos` / `facing` / `holding` / `jumps` 的最小网格模型），只为让事件 `detail.state_delta` 与最终状态 JSON 有内容；空手 `drop` 报 `LB-R005` 也是占位检查，Q5 定稿后可能整体改写（改写要提升 `exec_version` 并重生成 `fixtures/exec` 的 golden）；
+  4. **`LB-R001` 没有夹具**：它是防御路径（§6 的 `op` 只能来自文法定义，合法 `Ir` 走不到），只有单元测试覆盖；`parse_error` 本层永不产出（输入已是 `Ir`）；
+  5. 事件流只是「事件流」，不是 §8 的完整运行记录（缺 `RunHeader` 与各层打包，属 LB-009）。
+- **LB-007 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/runtime/`，LB-008 起的条目原样保留）。
+- **LB-007 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-018 —— §7 没有一步的虚拟耗时与 `tick` ↔ 毫秒换算、没有 `limits` 判定顺序与边界、没有「超时是墙钟还是虚拟时钟」、`parse_error` 对执行器无意义、没有「最终状态」对象（本层加 `ExecState`）、`step_id` 没有「不绑定步骤」的写法、§9 只举了 `LB-R002`/`LB-R003`、没说 `detail` 里放什么、没说中断怎么触发与留痕。
 - **LB-003 只在合成图上验证过**：所有识别结论都来自 LB-002 的合成灰度图（无镜头畸变、无运动模糊）。真实摄像头的鲁棒性（反光、阴影、透视更大、运动模糊）没有证据，属 LB-010/LB-020。
 - **LB-003 已知的识别偏差（如实计入统计，不隐藏）**：
   1. `overlap` 场景 3 张卡只识别出 1 张：标记 12 完全漏检（标记被纸片/卡片盖住），标记 6 检出形状但码字不可译码（报 `occluded` 候选）；
