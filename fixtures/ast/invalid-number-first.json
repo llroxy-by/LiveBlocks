@@ -1,0 +1,55 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Layout",
+  "frame_id": "f-invalid-number-first",
+  "reading_direction": "ltr_ttb",
+  "rows": [
+    {
+      "row_index": 0,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-0",
+          "card_face": "move-forward",
+          "orientation_quadrant": 0,
+          "x_px": 100,
+          "y_px": 200,
+          "confidence": 0.9
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-1",
+          "card_face": "number-1",
+          "orientation_quadrant": 0,
+          "x_px": 180,
+          "y_px": 200,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "row_index": 1,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-2",
+          "card_face": "number-2",
+          "orientation_quadrant": 0,
+          "x_px": 100,
+          "y_px": 280,
+          "confidence": 0.9
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-3",
+          "card_face": "number-5",
+          "orientation_quadrant": 0,
+          "x_px": 180,
+          "y_px": 280,
+          "confidence": 0.9
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

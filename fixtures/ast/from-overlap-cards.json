@@ -1,0 +1,62 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Layout",
+  "frame_id": "f-overlap",
+  "reading_direction": "ltr_ttb",
+  "rows": [
+    {
+      "row_index": 0,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-1",
+          "card_face": "move-back",
+          "orientation_quadrant": 0,
+          "x_px": 248,
+          "y_px": 240,
+          "confidence": 1.0
+        }
+      ]
+    }
+  ],
+  "basis": {
+    "pitch_px": null,
+    "thresholds_px": {},
+    "reading_frame": {
+      "line_axis": "y",
+      "order_axis": "x",
+      "order_sign": 1,
+      "upright_quadrant": 0,
+      "description": "行自上而下，行内自左向右"
+    },
+    "counts": {
+      "input": 2,
+      "placed": 1,
+      "removed_duplicates": 0,
+      "excluded_unknown_identity": 1
+    },
+    "rows": [
+      {
+        "row_index": 0,
+        "candidate_ids": [
+          "c-1"
+        ],
+        "line_center_px": 240.0,
+        "order_span_px": [
+          248.0,
+          248.0
+        ]
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "code": "LB-L003",
+      "severity": "warning",
+      "message": "1 个候选身份未知，未纳入排列：c-0（occluded）；上游已按 LB-V001 / LB-V005 报告原因，这里保留候选 id 以便追溯",
+      "candidate_ids": [
+        "c-0"
+      ]
+    }
+  ]
+}

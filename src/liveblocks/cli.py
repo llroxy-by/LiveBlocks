@@ -13,6 +13,11 @@
   - ``liveblocks layout from-image --image <png>``     一步「识别 → 排列」（调试用）
   - ``liveblocks layout report``                       对 ``fixtures/layouts`` 跑排列并打印验收对照
 
+- LB-005：``parse`` 子命令组：
+
+  - ``liveblocks parse ast --layout <json>``   ``Layout`` → 符合 §5 的 ``Ast``（P0 最小文法）
+  - ``liveblocks parse report``                对 ``fixtures/ast`` 跑解析并打印验收对照
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -32,6 +37,8 @@ DEFAULT_SEED = 20261123
 DEFAULT_SCENE_DIR = Path("fixtures/scenes")
 #: LB-004 的候选夹具目录（``CardCandidateList`` JSON，见 ``fixtures/README.md`` §4）。
 DEFAULT_LAYOUT_DIR = Path("fixtures/layouts")
+#: LB-005 的语法夹具目录（``Layout`` JSON + 期望结果清单，见 ``fixtures/README.md`` §5）。
+DEFAULT_AST_DIR = Path("fixtures/ast")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -172,6 +179,32 @@ def build_parser() -> argparse.ArgumentParser:
     _add_layout_arguments(layout_report)
     layout_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     layout_report.set_defaults(handler=_cmd_layout_report)
+
+    parse = subparsers.add_parser(
+        "parse",
+        help="语法层（LB-005）：Layout → AST",
+        description="把协议 §4 的 Layout 读成 §5 的 Ast（P0 最小文法：语句序列 + 字面参数）；不求值、不执行。",
+    )
+    parse_sub = parse.add_subparsers(dest="parse_command", required=True)
+
+    ast = parse_sub.add_parser("ast", help="对一份 Layout JSON 做解析，输出 §5 的 Ast JSON")
+    ast.add_argument("--layout", type=Path, required=True, help="输入 Layout JSON（协议 §4）")
+    ast.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
+    ast.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="出现 LB-P0xx 语法诊断时以退出码 1 结束（默认 0：诊断随 Ast 一起输出）",
+    )
+    ast.set_defaults(handler=_cmd_parse_ast)
+
+    parse_report = parse_sub.add_parser(
+        "report", help="对语法夹具目录跑解析并打印逐条结果与验收对照"
+    )
+    parse_report.add_argument(
+        "--dir", type=Path, default=DEFAULT_AST_DIR, help="语法夹具目录（默认 fixtures/ast）"
+    )
+    parse_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    parse_report.set_defaults(handler=_cmd_parse_report)
 
     return parser
 
@@ -451,6 +484,68 @@ def _cmd_layout_report(args: argparse.Namespace) -> int:
         print(f"{args.dir} 里没有 CardCandidateList 夹具")
         return 1
     print(report.format(), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _cmd_parse_ast(args: argparse.Namespace) -> int:
+    import json
+
+    from .parser import parse_layout_document
+
+    if not args.layout.is_file():
+        raise SystemExit(f"找不到 Layout 文件：{args.layout}")
+    try:
+        document = json.loads(args.layout.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"{args.layout} 不是合法 JSON：{error}") from error
+    if not isinstance(document, dict) or document.get("kind") != "Layout":
+        kind = document.get("kind") if isinstance(document, dict) else type(document).__name__
+        raise SystemExit(f"{args.layout} 的 kind 是 {kind!r}，这里需要 Layout（协议 §4）")
+    try:
+        ast = parse_layout_document(document)
+    except ValueError as error:
+        raise SystemExit(f"{args.layout} 不是合法的 Layout：{error}") from error
+
+    text = json.dumps(ast.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    if args.out is None:
+        print(text, end="")
+    else:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
+        print(
+            f"写入 {args.out}（Ast，语句 {len(ast.root.body)}，节点 {len(list(ast.nodes()))}，"
+            f"诊断 {len(ast.diagnostics)} 条，frame_id={ast.frame_id}）"
+        )
+    if ast.diagnostics:
+        # 诊断摘要走 stderr，stdout 只有可以原样管道给下游的 JSON。
+        located = "，".join(
+            f"{entry['code']}@行{entry['span'].get('row', entry['span'].get('row_from'))}"
+            f"槽{entry['span'].get('slot_from')}"
+            for entry in ast.diagnostics
+        )
+        print(f"语法诊断 {len(ast.diagnostics)} 条：{located}", file=sys.stderr)
+        return 1 if args.fail_on_error else 0
+    return 0
+
+
+def _cmd_parse_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .parser import build_report, format_report
+
+    report = build_report(args.dir)
+    if not report.fixtures:
+        print(f"{args.dir} 里没有语法夹具（或清单缺失）")
+        if report.manifest_error:
+            print(f"清单问题：{report.manifest_error}")
+        return 1
+    print(format_report(report), end="")
     if args.json is not None:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(

@@ -7,9 +7,13 @@
   ArUco 卡片图像 + 真值 JSON，**不做识别**；
 - LB-003：识别模块（:mod:`liveblocks.vision`），标记检测 + 卡片字典映射 →
   ``MarkerCandidateList`` / ``CardCandidateList``（协议 §3），并给出准确率/漏检统计，
-  **不做排序、解析、执行**。
+  **不做排序、解析、执行**；
+- LB-004：排列层（:mod:`liveblocks.layout`），卡片候选 → ``Layout``（协议 §4：分簇、阅读方向
+  排序、朝向归一、去重、歧义诊断），**不解析语法**；
+- LB-005：语法层（:mod:`liveblocks.parser`），``Layout`` → ``Ast``（协议 §5），P0 最小文法
+  「语句序列 + 字面参数」，错误报 ``LB-P0xx`` 并定位到行/槽位/卡片，**不求值、不执行**。
 
-排列、解析、执行、界面按 ``docs/ROADMAP.md`` 的 LB-004 起逐条加入，并各自带测试。
+IR 规范化、执行、界面按 ``docs/ROADMAP.md`` 的 LB-006 起逐条加入，并各自带测试。
 """
 
 from __future__ import annotations

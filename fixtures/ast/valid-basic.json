@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Layout",
+  "frame_id": "f-valid-basic",
+  "reading_direction": "ltr_ttb",
+  "rows": [
+    {
+      "row_index": 0,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-0",
+          "card_face": "move-forward",
+          "orientation_quadrant": 0,
+          "x_px": 100,
+          "y_px": 200,
+          "confidence": 0.95
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-1",
+          "card_face": "number-1",
+          "orientation_quadrant": 0,
+          "x_px": 180,
+          "y_px": 200,
+          "confidence": 0.94
+        }
+      ]
+    },
+    {
+      "row_index": 1,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-2",
+          "card_face": "turn-left",
+          "orientation_quadrant": 0,
+          "x_px": 100,
+          "y_px": 280,
+          "confidence": 0.93
+        },
+        {
+          "slot_index": 1,
+          "candidate_id": "c-3",
+          "card_face": "number-2",
+          "orientation_quadrant": 0,
+          "x_px": 180,
+          "y_px": 280,
+          "confidence": 0.92
+        },
+        {
+          "slot_index": 2,
+          "candidate_id": "c-4",
+          "card_face": "number-3",
+          "orientation_quadrant": 0,
+          "x_px": 260,
+          "y_px": 280,
+          "confidence": 0.91
+        }
+      ]
+    },
+    {
+      "row_index": 2,
+      "slots": [
+        {
+          "slot_index": 0,
+          "candidate_id": "c-5",
+          "card_face": "jump",
+          "orientation_quadrant": 0,
+          "x_px": 100,
+          "y_px": 360,
+          "confidence": 0.9
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

@@ -4,8 +4,8 @@
 
 ## 现状
 
-- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**与 **LB-004 排列还原**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断）。
-- 仓库**还没有解析、执行、界面**（LB-005 起），因此目前不能说「能执行」「能显示」。识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
+- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**与 **LB-005 语法解析**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片）。
+- 仓库**还没有 IR 规范化、执行、界面**（LB-006 起），因此目前不能说「能执行」「能显示」。识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -127,6 +127,33 @@ liveblocks layout report --dir fixtures/layouts
 每个槽位都带来源 `candidate_id`，没有一个候选既没进槽位也没被诊断点名。取舍与已知限制见
 [docs/DECISIONS.md](docs/DECISIONS.md) D-015 与 [docs/PROGRESS.md](docs/PROGRESS.md) §4。
 
+## 语法解析（LB-005）
+
+把排列层输出的 `Layout` 读成语法树 `Ast`（协议 §5）：P0 只做**语句序列 + 字面参数**——一行卡片就是
+一条语句（第 0 个槽位必须是命令卡，后面跟字面数字卡当参数），整份 `Layout` 就是一个 `Program`。
+每个节点都带 `span`（行 + 槽位区间的闭区间）与 `origin`（来源卡片），因此报错能指回实体卡片。
+语法问题报 `LB-P001`…`LB-P005`（缺命令卡 / 参数位不是字面卡 / 空槽位或未知卡面 / 控制流卡超出
+P0 / 运算符卡超出 P0），策略是**整行丢弃、只报第一条**、其余行照常解析，所以非法输入也得到部分
+AST 而不会崩。**不求值、不执行**（那是 LB-006/LB-007 的活）。
+
+```bash
+# Layout JSON（协议 §4）→ Ast JSON（协议 §5）
+liveblocks parse ast --layout fixtures/ast/valid-basic.json
+
+# 非法样例：诊断随 Ast 输出（退出码 0）；加 --fail-on-error 让它变成非零退出码
+liveblocks parse ast --layout fixtures/ast/invalid-control-flow.json --fail-on-error
+
+# 对全部语法夹具跑一遍，打印逐条结果与验收对照（退出码 0 = 三条验收全过）
+liveblocks parse report --dir fixtures/ast
+```
+
+当前实测（`fixtures/ast`，8 个夹具 = 3 合法 + 5 非法）：3 条合法语句样例都通过 §5 校验（`valid-basic`
+3 语句 / 7 节点；`valid-empty` 空程序；`from-overlap-cards` 是 LB-004 的真实输出）；5 个非法夹具覆盖
+全部 5 个 `LB-P0xx` 码，每条诊断都带 `span` 与 `origin`，解析不抛异常。文法定义本身在
+[docs/GRAMMAR.md](docs/GRAMMAR.md)（草案 `grammar_version` 0.0.1），取舍、`span`/`origin` 约定与
+`PROTOCOL.md` §5/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-016 与
+[docs/PROGRESS.md](docs/PROGRESS.md) §4。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -134,6 +161,7 @@ liveblocks layout report --dir fixtures/layouts
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 端到端链路、模块边界、数据契约位置、待决事项 | 基线草案 |
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | 层间数据格式（识别 / 排列 / AST / IR / 执行反馈），**草案，未冻结** | 草案 v0.0.1 |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | 待验证的硬件选型、电源与引脚待确认项、卡片制作 | 待验证 |
+| [docs/GRAMMAR.md](docs/GRAMMAR.md) | P0 文法定义（产生式、卡面角色、AST 形状、`LB-P0xx` 码表），**草案** | 草案 v0.0.1（`grammar_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
@@ -158,13 +186,14 @@ liveblocks layout report --dir fixtures/layouts
 ├── src/liveblocks/       # 实现包
 │   ├── __init__.py
 │   ├── __main__.py       # python -m liveblocks
-│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout …
+│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout … / parse …
 │   ├── data/             # 卡片字典、ArUco 位表、版式定义、点阵字体（JSON）
 │   ├── synth/            # LB-002 合成卡片图像生成器（不做识别）
 │   ├── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
-│   └── layout/           # LB-004 排列层（卡片候选 → Layout、自检报告）
+│   ├── layout/           # LB-004 排列层（卡片候选 → Layout、自检报告）
+│   └── parser/           # LB-005 语法层（Layout → Ast、P0 文法定义与自检报告）
 ├── tests/                # pytest 用例，testpaths = tests
-├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）
+├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```
