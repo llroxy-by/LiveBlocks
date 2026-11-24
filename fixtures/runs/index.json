@@ -1,0 +1,285 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "RunRecordIndex",
+  "ui_version": "0.0.1",
+  "generator": {
+    "name": "liveblocks.ui",
+    "package_version": "0.0.1"
+  },
+  "fixtures": [
+    {
+      "name": "sample-clipped",
+      "file": "sample-clipped.jsonl",
+      "family": "sample",
+      "source": "真跑出来的：scripts/build_run_records.py（识别 → 排列 → 语法 → IR → 模拟执行）",
+      "note": "裁切场景的两张卡里有一张能构成完整语句：1 步 / 3 条事件",
+      "stats": {
+        "markers": 2,
+        "cards": 2,
+        "rows": 1,
+        "steps": 1,
+        "events": 3,
+        "status": "ok"
+      },
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 3,
+        "steps": 1,
+        "issue_codes": [],
+        "hashes": {
+          "html_final": "f896e045b6d5d12385b81473ac5391b2a4f4494ee7de79062b285c7b4bc2624c",
+          "html_step0": "1ee2d032b94f28e36740163ddf5615d564b82311d4d04cfc56c65c9f1b72a689",
+          "text_final": "7c72caf9ee765003605335ea3d869195401a91a65559f6bda90213f2798dc362",
+          "overlay": "36c4340f4bb8e9fb92923e6aa85e888889b609bbe70c20d4de21c695ce6dc7c4"
+        }
+      }
+    },
+    {
+      "name": "sample-multi-row",
+      "file": "sample-multi-row.jsonl",
+      "family": "sample",
+      "source": "真跑出来的：scripts/build_run_records.py（识别 → 排列 → 语法 → IR → 模拟执行）",
+      "note": "两行六卡：排列有两行，语法层报 LB-P002 / LB-P004，IR 因此 0 步",
+      "stats": {
+        "markers": 6,
+        "cards": 6,
+        "rows": 2,
+        "steps": 0,
+        "events": 1,
+        "status": "ok"
+      },
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 1,
+        "steps": 0,
+        "issue_codes": [],
+        "hashes": {
+          "html_final": "5905c1409ba561f7455562068c3478c330862b92ec2643cdc5a1a88370ddac42",
+          "html_step0": "ed26d94053129b2a33eb31de3cc25591a5fbed7826daf84d30b7769b09f4286b",
+          "text_final": "79930162dfff30e058d2607ae798a00ef4eb5e117774a47ba59af2052351636d",
+          "overlay": "eac92ea398750114972e1232a7a9a01364644ed35b410de1d4873019228f60ce"
+        }
+      }
+    },
+    {
+      "name": "sample-all-ops",
+      "file": "sample-all-ops.jsonl",
+      "family": "partial",
+      "source": "真跑出来的：fixtures/ir/golden/all-ops.json 交给模拟执行器（只有执行层）",
+      "note": "LB-006 的 all-ops golden Ir（8 步 / 17 条事件）真跑一遍",
+      "stats": {
+        "markers": 0,
+        "cards": 0,
+        "rows": 0,
+        "steps": 8,
+        "events": 17,
+        "status": "ok"
+      },
+      "expect": {
+        "layers": [
+          "ir",
+          "exec"
+        ],
+        "events": 17,
+        "steps": 8,
+        "issue_codes": [
+          "LB-U004",
+          "LB-U007",
+          "LB-U009"
+        ],
+        "hashes": {
+          "html_final": "25f1820efec4c9bafb07ecdae9f35b36708b11c13e10e39d54ec77aa0111cccc",
+          "html_step0": "815f43f0a748afa762164240de9c5650adb04e3b7df03d84831023a5e0b8d3a5",
+          "text_final": "4e6e2ff3d2d66f67d30e9d2aadb472601a7572ffe50ec936e40f63e87115be81",
+          "overlay": "841f6a78626aec798b4691473ca85362132c0623a5983710a9f8411661f3d0a2"
+        }
+      }
+    },
+    {
+      "name": "corrupt-bad-events",
+      "file": "corrupt/bad-events.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "事件 seq 不递增、at_ms 回退、phase 缺失 → 报 LB-U008 / LB-U003，事件按出现顺序展示，不排序、不修补",
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 3,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U003",
+          "LB-U004",
+          "LB-U008"
+        ],
+        "hashes": {
+          "html_final": "3da5b72382a2753d00a09900381357df435b82e366f60975614419d0d4d10e12",
+          "html_step0": "747183e136a28d248999ad4eb15891b9d7fd7bec5ed0fa5d6a9b2a53cf084c75",
+          "text_final": "9235fb1c0ab955c7666d86190866aaf609f42ae0a0f5245b00319bea7f23c3d6",
+          "overlay": "9e885a5408facc9078e2b3f1f2a24e4462d1fddef4e17017444bf9157c33e566"
+        }
+      }
+    },
+    {
+      "name": "corrupt-bad-frame",
+      "file": "corrupt/bad-frame.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "RunHeader.frame.image_ref 指向不存在的文件 → 报 LB-U007，叠加面板显示占位图，其余四层照常",
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 1,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U003",
+          "LB-U004",
+          "LB-U007"
+        ],
+        "hashes": {
+          "html_final": "eccabdc60afca1c2931899b5449d716b08b8e69e6877b32f835e56a9489995e5",
+          "html_step0": "9669b2d81624cc0074b815c4ec9813b3cb9ed29943adb8063c0b60b4dfa3437a",
+          "text_final": "6f928e6b7d30d60d79acc560aa8144ee247405f44de01a204f69ff9b7285dd61",
+          "overlay": "3fde8514f4456844a2724133cf56a69d6959563882700b45e92bef7281ea5117"
+        }
+      }
+    },
+    {
+      "name": "corrupt-bad-json",
+      "file": "corrupt/bad-json.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "第 4 行是截断的 JSON → 整行丢弃并报 LB-U001，其余层照常渲染（不是整份记录失败）",
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 1,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U001",
+          "LB-U003",
+          "LB-U004"
+        ],
+        "hashes": {
+          "html_final": "d8ea35f187a08dd641718aadc9febe6e94fbac34c0e5768d372b56399e108f8f",
+          "html_step0": "db4554107f3ee57faff297b9708ceb777c1ca6aadfdfb6b73369fc3832febada",
+          "text_final": "eb5efa2686ffb4422854b09b947c8023694bfc7b4eac69b63bbe119bd4d0b6b0",
+          "overlay": "9e885a5408facc9078e2b3f1f2a24e4462d1fddef4e17017444bf9157c33e566"
+        }
+      }
+    },
+    {
+      "name": "corrupt-missing-fields",
+      "file": "corrupt/missing-fields.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "header 缺 run_id/backend/timings_ms，卡片缺 center_px，事件缺 seq/phase，result 缺 status → 逐个字段报 LB-U003 / LB-U009，缺的条目跳过，界面显示占位",
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 0,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U003",
+          "LB-U004",
+          "LB-U009"
+        ],
+        "hashes": {
+          "html_final": "32e8d36baedffb417b53f9e5a7cc8340e2182a38f4f828a082c9207b4128f83e",
+          "html_step0": "32e8d36baedffb417b53f9e5a7cc8340e2182a38f4f828a082c9207b4128f83e",
+          "text_final": "41c0b90ba3e77154859ef9f6ae61afcde76c1cb83b94d86d3008d9e0907f5cb6",
+          "overlay": "ab27dac69b5f55200d9c4b9c257cc525634ab34545964f51b49029db7a2cafca"
+        }
+      }
+    },
+    {
+      "name": "corrupt-no-header",
+      "file": "corrupt/no-header.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "首行是 Layout，没有 RunHeader → 报 LB-U006 且继续解析后面的层（缺 vision / ast 层另有 LB-U004）",
+      "expect": {
+        "layers": [
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 0,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U004",
+          "LB-U006",
+          "LB-U007"
+        ],
+        "hashes": {
+          "html_final": "eb172e9c4f119f9bcbfc6f40b806bf58ec1202dfb8503f2a9aaf4636f6df193a",
+          "html_step0": "eb172e9c4f119f9bcbfc6f40b806bf58ec1202dfb8503f2a9aaf4636f6df193a",
+          "text_final": "751c67addddfc8758f455ef4c74032641f3becdea8dc6703beaa933035779116",
+          "overlay": "fe3c378fde8c4e2ada31568aad402b03a97d2e98e90ae15e8c441242ef782de0"
+        }
+      }
+    },
+    {
+      "name": "corrupt-unknown-kind",
+      "file": "corrupt/unknown-kind.jsonl",
+      "family": "corrupt",
+      "source": "手写：故意写坏的记录，用证明「给可见提示而不是崩溃」",
+      "note": "出现 §8 没有的 kind，Ast 早于 Layout，Layout 重复一次 → 报 LB-U002 / LB-U005，未知行忽略、重复层只保留第一份",
+      "expect": {
+        "layers": [
+          "vision",
+          "layout",
+          "ast",
+          "ir",
+          "exec"
+        ],
+        "events": 1,
+        "steps": 0,
+        "issue_codes": [
+          "LB-U002",
+          "LB-U003",
+          "LB-U004",
+          "LB-U005"
+        ],
+        "hashes": {
+          "html_final": "24069fd1115acf24d026dd3f98d92d57435dcc663b92c3b15b5925bcc13de02d",
+          "html_step0": "a9f251a31cf6d3414b40a8238813a818c92f3524296508c4b084866981badc9e",
+          "text_final": "84876f29ec1c59de784886bb72ec98de31296ed2f9c04ca029b6b0bb694ab2b5",
+          "overlay": "9e885a5408facc9078e2b3f1f2a24e4462d1fddef4e17017444bf9157c33e566"
+        }
+      }
+    }
+  ]
+}

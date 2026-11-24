@@ -28,6 +28,12 @@
   - ``liveblocks exec run --ir <json>``   ``Ir`` → 事件流（§7.1）+ ``ExecResult``（§7.2）+ 最终状态 JSON
   - ``liveblocks exec report``            对 ``fixtures/exec`` 真跑一遍并打印验收对照（含实测耗时）
 
+- LB-008：``ui`` 子命令组（调试视图，**只读**消费 §8 运行记录）：
+
+  - ``liveblocks ui view --record <jsonl>``    一屏五层视图（文本 / 自包含 HTML / 叠加 PNG）
+  - ``liveblocks ui replay --record <jsonl>``  回放：打印时间线并核对「两次回放一致」
+  - ``liveblocks ui report --dir fixtures/runs`` 对运行记录夹具跑一遍并打印验收对照
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -53,6 +59,8 @@ DEFAULT_AST_DIR = Path("fixtures/ast")
 DEFAULT_IR_DIR = Path("fixtures/ir")
 #: LB-007 的执行夹具目录（``Ir`` JSON + golden 事件流/最终状态 + 清单，见 ``fixtures/README.md`` §7）。
 DEFAULT_EXEC_DIR = Path("fixtures/exec")
+#: LB-008 的运行记录目录（§8 JSONL + 清单，见 ``fixtures/README.md`` §8）。
+DEFAULT_RUN_DIR = Path("fixtures/runs")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -308,6 +316,53 @@ def build_parser() -> argparse.ArgumentParser:
     )
     exec_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     exec_report.set_defaults(handler=_cmd_exec_report)
+
+    ui = subparsers.add_parser(
+        "ui",
+        help="调试界面（LB-008）：把 §8 运行记录渲染成一屏分层视图（只读）",
+        description=(
+            "把一份 §8 运行记录（JSONL）渲染成一屏五层视图：帧叠加、排列、AST、IR、事件流与分层耗时；"
+            "支持回放与单步。界面只读，不改任何业务数据。"
+        ),
+    )
+    ui_sub = ui.add_subparsers(dest="ui_command", required=True)
+
+    ui_view = ui_sub.add_parser("view", help="渲染一屏视图（默认打印文本形态）")
+    ui_view.add_argument("--record", type=Path, required=True, help="§8 运行记录（JSONL）")
+    ui_view.add_argument(
+        "--step",
+        type=int,
+        default=None,
+        help="单步位置：处理完前 N 条 ExecEvent（默认末帧；越界自动夹紧）",
+    )
+    ui_view.add_argument(
+        "--format",
+        choices=("text", "html", "none"),
+        default="text",
+        help="打印哪种形态到标准输出（默认 text；html 供浏览器打开）",
+    )
+    ui_view.add_argument("--html-out", type=Path, default=None, help="把自包含 HTML 写到文件")
+    ui_view.add_argument("--text-out", type=Path, default=None, help="把文本形态写到文件")
+    ui_view.add_argument("--overlay-out", type=Path, default=None, help="把帧叠加面板的 PNG 写到文件")
+    ui_view.add_argument(
+        "--fail-on-error",
+        action="store_true",
+        help="记录里有 error 级问题（LB-U0xx）时以退出码 1 结束（默认 0：照常渲染）",
+    )
+    ui_view.set_defaults(handler=_cmd_ui_view)
+
+    ui_replay = ui_sub.add_parser("replay", help="回放：打印时间线并核对两次回放是否一致")
+    ui_replay.add_argument("--record", type=Path, required=True, help="§8 运行记录（JSONL）")
+    ui_replay.add_argument("--step", type=int, default=None, help="只看某一帧（默认打印整条时间线）")
+    ui_replay.add_argument("--max-steps", type=int, default=40, help="时间线最多打印多少帧（默认 40）")
+    ui_replay.set_defaults(handler=_cmd_ui_replay)
+
+    ui_report = ui_sub.add_parser("report", help="对运行记录夹具目录跑一遍，打印验收对照")
+    ui_report.add_argument(
+        "--dir", type=Path, default=DEFAULT_RUN_DIR, help="运行记录目录（默认 fixtures/runs）"
+    )
+    ui_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    ui_report.set_defaults(handler=_cmd_ui_report)
 
     return parser
 
@@ -813,6 +868,169 @@ def _cmd_exec_report(args: argparse.Namespace) -> int:
         )
         print(f"报告已写入 {args.json}")
     return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _cmd_ui_view(args: argparse.Namespace) -> int:
+    """渲染一屏视图：文本 / 自包含 HTML / 叠加 PNG（写盘）。"""
+    from .ui.protocol import LAYER_ORDER
+    from .ui.render import build_view_from_file
+
+    if not args.record.is_file():
+        raise SystemExit(f"找不到运行记录：{args.record}")
+    view = build_view_from_file(args.record, step=args.step)
+    counts = view.severity_counts
+    print(
+        f"记录 {args.record}：{view.record.summary()}；单步 {view.step}/{view.replay.total_steps}",
+        file=sys.stderr,
+    )
+    print(
+        "五层："
+        + "、".join(
+            f"{layer}=" + ("有" if view.layer_present[layer] else "缺") for layer in LAYER_ORDER
+        ),
+        file=sys.stderr,
+    )
+    if view.issues:
+        print(
+            f"提示 {len(view.issues)} 条（error {counts['error']} / warning {counts['warning']} / "
+            f"info {counts['info']}）："
+            + "、".join(sorted({entry.code for entry in view.issues})),
+            file=sys.stderr,
+        )
+    for entry in view.issues:
+        print(f"  {entry.describe()}", file=sys.stderr)
+
+    if args.html_out is not None:
+        args.html_out.parent.mkdir(parents=True, exist_ok=True)
+        args.html_out.write_text(view.render_html(), encoding="utf-8")
+        print(f"HTML 已写入 {args.html_out}", file=sys.stderr)
+    if args.text_out is not None:
+        args.text_out.parent.mkdir(parents=True, exist_ok=True)
+        args.text_out.write_text(view.render_text(), encoding="utf-8")
+        print(f"文本视图已写入 {args.text_out}", file=sys.stderr)
+    if args.overlay_out is not None:
+        args.overlay_out.parent.mkdir(parents=True, exist_ok=True)
+        args.overlay_out.write_bytes(view.overlay_png)
+        print(f"叠加图已写入 {args.overlay_out}", file=sys.stderr)
+
+    if args.format == "text":
+        sys.stdout.write(view.render_text())
+    elif args.format == "html":
+        sys.stdout.write(view.render_html())
+    if args.fail_on_error and any(entry.severity == "error" for entry in view.issues):
+        return 1
+    return 0
+
+
+def _cmd_ui_replay(args: argparse.Namespace) -> int:
+    """回放一份记录：打印时间线，并核对「同一记录回放两次结果一致」。"""
+    import time
+
+    from .ui.record import parse_record_file
+    from .ui.render import build_view
+    from .ui.replay import build_replay
+
+    if not args.record.is_file():
+        raise SystemExit(f"找不到运行记录：{args.record}")
+    started = time.perf_counter()
+    record = parse_record_file(args.record)
+    parse_ms = (time.perf_counter() - started) * 1000.0
+    started = time.perf_counter()
+    replay = build_replay(record)
+    replay_ms = (time.perf_counter() - started) * 1000.0
+    started = time.perf_counter()
+    view = build_view(record, step=args.step, record_path=args.record)
+    rendered = (view.render_html(), view.render_text(), view.overlay_png)
+    render_ms = (time.perf_counter() - started) * 1000.0
+
+    print(f"回放 {args.record}")
+    print(
+        f"  run_id={record.run_id or '?'} backend={record.backend or '?'} "
+        f"事件={len(record.events)} 时间线={len(replay.states)} 帧 问题={len(view.issues)}"
+    )
+    shown = replay.states if args.step is None else (replay.state_at(args.step),)
+    for state in shown[: max(1, args.max_steps)]:
+        current = "  当前帧" if state.index == view.step else ""
+        print(f"  {state.describe()}{current}")
+    if len(shown) > max(1, args.max_steps):
+        print(f"  …（还有 {len(shown) - max(1, args.max_steps)} 帧，用 --max-steps 调整）")
+    for note in replay.notes:
+        print(f"  ! {note}")
+
+    second_record = parse_record_file(args.record)
+    second_replay = build_replay(second_record)
+    second_view = build_view(second_record, step=args.step, record_path=args.record)
+    checks = {
+        "HTML": second_view.render_html() == rendered[0],
+        "文本": second_view.render_text() == rendered[1],
+        "叠加图": second_view.overlay_png == rendered[2],
+        "时间线": second_replay.signature() == replay.signature(),
+    }
+    print("  两次回放：" + " / ".join(f"{key} {'一致' if value else '不一致'}" for key, value in checks.items()))
+    print(
+        f"  实测（只是参考，不是性能结论）：解析 {parse_ms:.2f} ms，回放 {replay_ms:.2f} ms，"
+        f"渲染 {render_ms:.2f} ms"
+    )
+    return 0 if all(checks.values()) else 1
+
+
+def _cmd_ui_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .ui.report import build_report, format_report
+
+    report = build_report(args.dir)
+    if not report.fixtures:
+        print(f"{args.dir} 里没有运行记录夹具（或清单缺失）")
+        if report.manifest_error:
+            print(f"清单问题：{report.manifest_error}")
+        return 1
+    print(format_report(report), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report_to_dict(report), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if report.passes() else 1
+
+
+def report_to_dict(report) -> dict[str, object]:
+    """把 UI 自检报告序列化成 JSON（机器可读，供 CI/PR 附证据）。"""
+    from .ui.protocol import UI_VERSION
+
+    return {
+        "directory": str(report.directory),
+        "ui_version": UI_VERSION,
+        "manifest_error": report.manifest_error,
+        "wall_ms": round(report.wall_ms, 3),
+        "doc_gaps": list(report.doc_gaps),
+        "evidence": report.evidence,
+        "evidence_problems": list(report.evidence_problems),
+        "fixtures": [
+            {
+                "name": item.name,
+                "file": str(item.path),
+                "family": item.family,
+                "layers": list(item.layers),
+                "events": item.events,
+                "steps": item.steps,
+                "issues": item.issues,
+                "issue_codes": list(item.issue_codes),
+                "hashes": item.hashes,
+                "hash_mismatches": list(item.hash_mismatches),
+                "determinism": item.determinism[0],
+                "determinism_detail": item.determinism[1],
+                "step_probe": item.step_probe[0],
+                "error": item.error,
+            }
+            for item in report.fixtures
+        ],
+        "acceptance": [
+            {"ok": ok, "criterion": criterion, "evidence": evidence}
+            for ok, criterion, evidence in report.acceptance()
+        ],
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
