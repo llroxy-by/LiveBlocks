@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": []
+}

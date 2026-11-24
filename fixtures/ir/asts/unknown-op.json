@@ -1,0 +1,104 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ast",
+  "frame_id": "f-ir-unknown-op",
+  "grammar_version": "0.0.1",
+  "root": {
+    "node": "Program",
+    "span": {
+      "row_from": 0,
+      "row_to": 2,
+      "slot_from": 0,
+      "slot_to": 1
+    },
+    "body": [
+      {
+        "node": "Command",
+        "span": {
+          "row": 0,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "move-forward",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 0,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 1,
+            "origin": {
+              "candidate_id": "c-1",
+              "card_face": "number-1"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-0",
+          "card_face": "move-forward"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 1,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "teleport",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-2",
+          "card_face": "teleport"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 2,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "repeat",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 2,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 2,
+            "origin": {
+              "candidate_id": "c-4",
+              "card_face": "number-2"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-3",
+          "card_face": "repeat"
+        }
+      }
+    ],
+    "origin": {
+      "candidate_ids": [
+        "c-0",
+        "c-1",
+        "c-2",
+        "c-3",
+        "c-4"
+      ],
+      "card_faces": [
+        "move-forward",
+        "number-1",
+        "teleport",
+        "repeat",
+        "number-2"
+      ]
+    }
+  },
+  "diagnostics": []
+}

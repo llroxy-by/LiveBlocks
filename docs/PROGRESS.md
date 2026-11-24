@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-23（LB-005 语法层：`Layout` → `Ast` + P0 文法文档，PR 见本仓库 `agent/lb-parser-*` 分支）
+> 最近更新：2026-11-24（LB-006 规范化层：`Ast` → `Ir` + op 表 / schema 校验 / golden 快照，PR 见本仓库 `agent/lb-ir-*` 分支）
 
 ## 1. 已验证
 
@@ -59,15 +59,23 @@
 | LB-005 语法层测试与本地检查 | `PYTHON=/tmp/lb-venv-parser/bin/python bash scripts/check.sh` → `compileall` 通过、`372 passed, 2 skipped in 93.00s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.2.0；跳过的 2 项与 LB-002/LB-003/LB-004 相同，是只有装 OpenCV 才跑的交叉核对）；其中新增语法层 113 例：`tests/test_parser_grammar.py` 17、`tests/test_parser_ast.py` 35、`tests/test_parser_parse.py` 22、`tests/test_parser_fixtures.py` 26、`tests/test_parser_cli.py` 13 | LB-005 PR |
 | LB-005 CI 对 PR 显示检查结果 | PR #15 的 `ci` 工作流（run 45202956585，commit d1cc91a）两个矩阵任务均通过：`check (python 3.11)` pass（1m05s，`372 passed, 2 skipped in 55.73s`，解释器 Python 3.11.18）、`check (python 3.13)` pass（1m19s，`372 passed, 2 skipped in 70.29s`，解释器 Python 3.13.18），各自执行 `bash scripts/check.sh` 并以「==> 检查通过」结束；跳过的 2 项与 LB-002/LB-003/LB-004 相同，是只有装 OpenCV 才跑的交叉核对 | LB-005 PR #15 |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，以及 **LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照；仍未包含**规范化 IR、执行、界面**（LB-006 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
+| LB-006 规范化层：`Ast`（§5）→ `Ir`（§6），确定性输出、显式 `limits`、op 表校验与入库 JSON Schema | 实现见 `src/liveblocks/ir/`（`ops.py` op 表 + 文档核对、`schema.py` 零依赖 schema 校验器、`protocol.py` 数据模型 + 确定性序列化 + 语义校验、`normalize.py` 规范化、`report.py` 自检报告），schema 见 `src/liveblocks/data/ir_schema.json`；`python -m liveblocks ir normalize --ast fixtures/ir/asts/all-ops.json` 输出 §6 的 `Ir`（8 步 / 0 诊断 / limits 1000·5000）；`python -m liveblocks ir report --dir fixtures/ir` 打印 8 个夹具结果与 5 条验收对照，退出码 0 | LB-006 PR |
+| LB-006 同一 AST 规范化两次输出字节一致（确定性） | `liveblocks ir report --dir fixtures/ir` 的验收行「同一 AST 规范化两次输出字节一致：通过」，依据为「8 个夹具各自规范化两次，字节全等」；`tests/test_ir_normalize.py::test_normalize_is_byte_identical_across_calls_and_processes` 除同进程两次相等外，还用 `PYTHONHASHSEED=0/1/12345` 的三个子进程跑 `python -m liveblocks ir normalize` 比对 stdout 字节（三个输出完全一致，且等于入库 golden）；`tests/test_ir_fixtures.py::test_normalization_is_stable_per_fixture`、`test_canonical_text_is_byte_stable_and_deterministic` 覆盖同一件事 | LB-006 PR |
+| LB-006 未知 `op` 报 `LB-I001` | `python -m liveblocks ir normalize --ast fixtures/ir/asts/unknown-op.json` → 1 步 + 2 条 `LB-I001`（`teleport` 不在 op 表、`repeat` 是文法外的控制流卡），诊断带 `severity: "error"`、`candidate_ids` 与 `span`，stderr 打印 `LB-I001@行1槽0，LB-I001@行2槽0`；`--fail-on-error` → 退出码 1；`tests/test_ir_normalize.py::test_unknown_op_reports_lb_i001_and_drops_the_statement`、`test_control_flow_card_is_an_unknown_op`、`tests/test_ir_cli.py::test_ir_normalize_fail_on_error` | LB-006 PR |
+| LB-006 产出的 IR 通过 schema 校验 | schema 是入库的 `src/liveblocks/data/ir_schema.json`（JSON Schema draft 2020-12）+ 零依赖校验器；`liveblocks ir report --dir fixtures/ir` 的验收行「IR 通过 schema 校验：通过」，依据为「8 份 Ir 全部通过入库 schema 与语义校验」；`tests/test_ir_fixtures.py::test_golden_documents_pass_schema_and_semantic_validation`（8 例参数化）对入库 golden 逐份调 `validate_document` + `validate_ir`；`tests/test_ir_protocol.py` 用 34 类违约文档参数化断言 `validate_ir` 必须拒绝、并反向验证「schema 用了校验器不支持的关键字」会被报出；装得上 `jsonschema` 时用它当独立实现交叉核对（CI 只装 `.[dev]` 时该例 skip） | LB-006 PR |
+| LB-006 golden 文件快照测试通过 | `fixtures/ir/`：8 份 Ast 输入（3 份上游快照 + 5 份手写）+ 8 份 golden `Ir` + `index.json` 清单；golden 由 `liveblocks ir normalize --ast … --out …` 生成；`liveblocks ir report --dir fixtures/ir` 的验收行「golden 文件快照测试通过：通过」，依据为「8 个夹具的输出与入库 golden 逐字节一致」；`tests/test_ir_fixtures.py::test_golden_snapshot_matches_fresh_normalization`（8 例）、`tests/test_ir_cli.py::test_ir_normalize_prints_section6_document`（stdout 与 golden 逐字节相等）、`test_ir_report_detects_a_broken_golden`（改一个字节后报告必须失败，反证快照不是假通过） | LB-006 PR |
+| LB-006 `limits` 显式化与缺省值填充 | 缺省取 §6 示例的 `max_steps` 1000 / `timeout_ms` 5000，规范化阶段就写进 `program.limits`；`tests/test_ir_normalize.py::test_empty_program_still_has_explicit_limits`（空程序也带 limits）、`test_limits_defaults_come_from_section6_example`、`test_limits_can_be_overridden_and_are_written_into_ir`、`test_invalid_limits_raise`（0 / 负数 / 浮点 / bool 五类拒绝）、`tests/test_ir_cli.py::test_ir_normalize_limits_flags_are_written_into_ir`（`--max-steps 12 --timeout-ms 800` 写进 Ir）；`ir report` 的第 5 条验收「limits 显式化」逐夹具核对 | LB-006 PR |
+| LB-006 op 表 / 元数表与文档一致，且四个 `LB-I0xx` 码都有真实触发路径 | `src/liveblocks/ir/ops.py::op_table_gaps` 核对 op 表覆盖卡片字典里全部 `command` 角色卡面（`ir report` 打印「op 表缺口 0 项」）；`ir_document_gaps` 逐行核对 `docs/IR.md` 的 op 表（卡面/op/参数/元数/单位）、诊断码标题、`limits` 缺省值与 schema 文件名（`ir report` 打印「文档缺口 0 项」）；`tests/test_ir_docs.py`（19 例）含 5 类**反向验证**（删掉一行 op 表 / 一个诊断码标题 / 一个 `limits` 缺省值 / schema 引用 / `step_id` 说明后必须报缺口，另两类用 monkeypatch 验证 op 表多一张卡、少一张卡都会报缺口）；`tests/test_ir_normalize.py::test_every_ir_code_is_reachable` 断言 `LB-I001`…`LB-I004` 全部有触发路径，`tests/test_ir_fixtures.py::test_every_ir_code_appears_in_some_fixture` 断言四个码都在夹具里出现过 | LB-006 PR |
+| LB-006 规范化层测试与本地检查 | `PYTHON=/tmp/lb-venv-ir-ci/bin/python bash scripts/check.sh`（等价 CI 环境：只装 `.[dev]`）→ `compileall` 通过、`531 passed, 3 skipped in 78.79s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2；跳过的 3 项是只有装 OpenCV 才跑的两条交叉核对与本单新增的 jsonschema 交叉核对）；另在装了 `jsonschema` 的本地 venv 里 `python -m pytest tests/test_ir_protocol.py` → `46 passed`（0 skipped，交叉核对真的跑了）；其中新增规范化层 160 例：`tests/test_ir_protocol.py` 46、`tests/test_ir_normalize.py` 32、`tests/test_ir_fixtures.py` 48、`tests/test_ir_cli.py` 15、`tests/test_ir_docs.py` 19（其中 1 例是 jsonschema 交叉核对，未装 jsonschema 时 skip） | LB-006 PR |
+
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，以及 **LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照；仍未包含**执行与界面**（LB-007 起），也没有任何真实摄像头 / 实体卡片的证据（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 / LB-005 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块、排列层与语法层，没有规范化 IR 及其后面的任何模块）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 / LB-002 / LB-003 / LB-004 / LB-005 / LB-006 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库中只有骨架、合成卡片生成器、识别模块、排列层、语法层与规范化层，没有执行器与界面）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-006 | 规范化 IR | 计划中 |
 | LB-007 | 模拟执行器 | 计划中 |
 | LB-008 | 调试界面（分层可视化） | 计划中 |
 | LB-009 | 端到端回归与运行记录 | 计划中 |
@@ -92,7 +100,7 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有规范化 IR、执行、界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层与 LB-005 语法层（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收与 8 个语法夹具的解析验收），但**没有 IR 规范化、执行、界面**，因此任何「能执行」「能显示」的说法目前都不成立。
+- **还没有执行器与界面**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层与 LB-006 规范化层（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收与 8 个 IR 夹具的 golden 快照验收），但**没有执行器与调试界面**，因此任何「能执行」「能显示」的说法目前都不成立；IR 只是**执行计划**，还没有任何后端跑过它（LB-007 起）。
 - **LB-003 只在合成图上验证过**：所有识别结论都来自 LB-002 的合成灰度图（无镜头畸变、无运动模糊）。真实摄像头的鲁棒性（反光、阴影、透视更大、运动模糊）没有证据，属 LB-010/LB-020。
 - **LB-003 已知的识别偏差（如实计入统计，不隐藏）**：
   1. `overlap` 场景 3 张卡只识别出 1 张：标记 12 完全漏检（标记被纸片/卡片盖住），标记 6 检出形状但码字不可译码（报 `occluded` 候选）；
@@ -116,6 +124,14 @@
   3. 错误恢复是「整行丢弃 + 只报第一条」：被丢掉那行里合法的卡也不会进 AST（诊断的 `span`/`origin` 能指回原卡，原 `Layout` 也仍在运行记录里）；
   4. 「一行 = 一条语句」是本实现对 §4 `rows` 的读法：与 D-015「`ttb_ltr` 下的一行是画面上的一列」兼容（本层只看 `rows`/`slots` 顺序），但若将来把「一行」改成严格横排，本层要一起改；
   5. `fixtures/ast` 里 6 个手写夹具是同类例外（LB-002/LB-003/LB-004 的现有夹具凑不出「数字卡打头」「运算符占参数位」这类语法错误），另外 2 个是 LB-004 真实输出的快照。
+- **LB-006 已知限制（详见 `docs/DECISIONS.md` D-017 与 `docs/IR.md`）**：
+  1. **`op` 取卡面本身**（`move-forward` / `move-back` / …），而 §6 示例写的是 `op: "move"`；本实现按 §6 自己那句「`op` 取值来自文法定义」取卡面，示例按示意处理——要统一成动词必须提升 `ir_version`；
+  2. **元数表是 P0 新定的语义**（D-016 把 arity 推给 LB-006）：`move-*` / `turn-*` / `wait` 各收 1 个参数、`jump` / `pick` / `drop` 收 0 个；因此**语法上合法但语义不成立的程序会在 IR 阶段降级**——`fixtures/ast` 的 `valid-basic`（`turn-left 2 3`）与 `from-overlap-cards`（单张 `move-back` 没带数字卡）各报一条 `LB-I002` 并丢掉那条语句，这是如实结果，不是 fixture 写错；
+  3. **单位只是标签**：`cell` / `quarter_turn` / `tick` 与物理量的换算（尤其 `tick` ↔ 毫秒）没有出处（Q5 未定），执行器要自己定义；
+  4. **`limits` 只写不判**：`len(steps) > max_steps` 不在本层报错，超限留到执行层的 `limit_exceeded` / `timeout`（LB-007）；
+  5. `fixtures/ir` 里 5 个手写 Ast 夹具是同类例外（现有 `fixtures/ast` 里凑不出「未知 op」「元数不符」这类**规范化**错误），另外 3 个是 LB-005 真实输出的快照（有测试用当前语法层重跑比对）。
+- **LB-006 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-017 —— §6 示例的 `op` 与卡面对不上、`Ir` 没有指回上游的字段、没定义 `args` 形状与元数、没给 `limits` 缺省值与「谁来填」、§9 只举了 `LB-I001` 一个例子、没说未知语句节点怎么降级、没有 schema 文件与 schema 版本线、`cell`/`quarter_turn`/`tick` 没有物理定义。
+- **LB-006 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/ir/`，LB-007 起的条目原样保留）。
 - **LB-005 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-016 —— §5 示例的 `Program.span` 与其槽位数自相矛盾、没定义跨行 `span`、没定义多卡 `origin`、示例的 `Number` 节点缺 `origin`、没有 `frame_id`（或上游引用）、`node` 开放枚举缺降级口径、`LB-P0xx` 只举了 `LB-P003` 一个例子、字面量只能是整数。
 - **LB-005 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/parser/`，LB-006 起的条目原样保留）。
 - **LB-004 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/layout/`，LB-005 起的条目原样保留）。

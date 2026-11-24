@@ -11,9 +11,11 @@
 - LB-004：排列层（:mod:`liveblocks.layout`），卡片候选 → ``Layout``（协议 §4：分簇、阅读方向
   排序、朝向归一、去重、歧义诊断），**不解析语法**；
 - LB-005：语法层（:mod:`liveblocks.parser`），``Layout`` → ``Ast``（协议 §5），P0 最小文法
-  「语句序列 + 字面参数」，错误报 ``LB-P0xx`` 并定位到行/槽位/卡片，**不求值、不执行**。
+  「语句序列 + 字面参数」，错误报 ``LB-P0xx`` 并定位到行/槽位/卡片，**不求值、不执行**；
+- LB-006：规范化层（:mod:`liveblocks.ir`），``Ast`` → ``Ir``（协议 §6），确定性输出、
+  显式 ``limits``、op 表校验与入库 JSON Schema，问题报 ``LB-I0xx``，**不执行**。
 
-IR 规范化、执行、界面按 ``docs/ROADMAP.md`` 的 LB-006 起逐条加入，并各自带测试。
+执行器与界面按 ``docs/ROADMAP.md`` 的 LB-007 起逐条加入，并各自带测试。
 """
 
 from __future__ import annotations

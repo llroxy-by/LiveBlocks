@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [
+      {
+        "step_id": "s0",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 0,
+          "slot": 0
+        }
+      }
+    ],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "LB-I001",
+      "severity": "error",
+      "message": "行 1 槽位 0 的命令卡 'teleport' 不在 P0 的 op 表里（docs/IR.md §2：op 只能取文法定义里的命令卡面，控制流卡不在 P0）；该语句不进 IR",
+      "candidate_ids": [
+        "c-2"
+      ],
+      "span": {
+        "row": 1,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    },
+    {
+      "code": "LB-I001",
+      "severity": "error",
+      "message": "行 2 槽位 0 的命令卡 'repeat' 不在 P0 的 op 表里（docs/IR.md §2：op 只能取文法定义里的命令卡面，控制流卡不在 P0）；该语句不进 IR",
+      "candidate_ids": [
+        "c-3"
+      ],
+      "span": {
+        "row": 2,
+        "slot_from": 0,
+        "slot_to": 0
+      }
+    }
+  ]
+}

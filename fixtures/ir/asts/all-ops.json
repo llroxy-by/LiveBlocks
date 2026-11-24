@@ -1,0 +1,232 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ast",
+  "frame_id": "f-ir-all-ops",
+  "grammar_version": "0.0.1",
+  "root": {
+    "node": "Program",
+    "span": {
+      "row_from": 0,
+      "row_to": 7,
+      "slot_from": 0,
+      "slot_to": 1
+    },
+    "body": [
+      {
+        "node": "Command",
+        "span": {
+          "row": 0,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "move-forward",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 0,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 1,
+            "origin": {
+              "candidate_id": "c-1",
+              "card_face": "number-1"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-0",
+          "card_face": "move-forward"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 1,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "move-back",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 1,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 2,
+            "origin": {
+              "candidate_id": "c-3",
+              "card_face": "number-2"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-2",
+          "card_face": "move-back"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 2,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "turn-left",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 2,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 1,
+            "origin": {
+              "candidate_id": "c-5",
+              "card_face": "number-1"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-4",
+          "card_face": "turn-left"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 3,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "turn-right",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 3,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 3,
+            "origin": {
+              "candidate_id": "c-7",
+              "card_face": "number-3"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-6",
+          "card_face": "turn-right"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 4,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "jump",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-8",
+          "card_face": "jump"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 5,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "pick",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-9",
+          "card_face": "pick"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 6,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "name": "drop",
+        "args": [],
+        "origin": {
+          "candidate_id": "c-10",
+          "card_face": "drop"
+        }
+      },
+      {
+        "node": "Command",
+        "span": {
+          "row": 7,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "wait",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 7,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 5,
+            "origin": {
+              "candidate_id": "c-12",
+              "card_face": "number-5"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-11",
+          "card_face": "wait"
+        }
+      }
+    ],
+    "origin": {
+      "candidate_ids": [
+        "c-0",
+        "c-1",
+        "c-2",
+        "c-3",
+        "c-4",
+        "c-5",
+        "c-6",
+        "c-7",
+        "c-8",
+        "c-9",
+        "c-10",
+        "c-11",
+        "c-12"
+      ],
+      "card_faces": [
+        "move-forward",
+        "number-1",
+        "move-back",
+        "number-2",
+        "turn-left",
+        "number-1",
+        "turn-right",
+        "number-3",
+        "jump",
+        "pick",
+        "drop",
+        "wait",
+        "number-5"
+      ]
+    }
+  },
+  "diagnostics": []
+}

@@ -94,6 +94,19 @@ S7 反馈与调试    执行状态/结果 → 调试界面叠加、模拟显示�
 - IR 是 AST 的规范化投影：确定性输出（稳定键序、无浮点抖动、无时间戳），便于快照回归与人工审阅。
 - 文法与 IR schema 都是**草案**，改动需在 `docs/DECISIONS.md` 记一条并说明兼容性。
 
+### 3.3a 规范化 IR（LB-006 落地）
+
+`src/liveblocks/ir/` 是 §2 表格里 `ir`（S5）那一行的实现：
+
+- 输入是 §5 的 `Ast`，输出是 §6 的 `Ir`；一条 `Command` 折成一步 `step`（`op` 取卡面、`args` 折成
+  「一个数值参数 + `unit`」、`source` 写 `{row, slot}`、`step_id` 密集编号）。
+- `op` 表（卡面 → op / 参数 / 元数 / 单位）与 `limits` 缺省值写在 `src/liveblocks/ir/ops.py`，
+  人类可读的同一份在 `docs/IR.md`；schema 是入库的 `src/liveblocks/data/ir_schema.json`，
+  配一个零依赖的最小校验器 + 语义校验（`validate_ir`）。
+- 确定性靠「固定构造顺序 + 单一序列化入口 + 只有整数 + 无时间戳」保证；golden 快照与「两次规范化
+  字节一致」都有测试。问题语句报 `LB-I0xx` 且**不进 IR**（不做截断/补零）。**不执行**（LB-007）。
+- 设计与协议缺口见 `docs/DECISIONS.md` D-017。
+
 ### 3.4 执行
 
 - 一次执行是「IR + 环境」→「事件流」的纯函数式过程（模拟后端）；硬件后端允许真实副作用，但事件流格式一致。
@@ -125,6 +138,7 @@ S7 反馈与调试    执行状态/结果 → 调试界面叠加、模拟显示�
 
 - 层间数据格式与错误码：`docs/PROTOCOL.md`（草案）。
 - P0 文法（`parser`（S4）那一行的「文法定义」）：`docs/GRAMMAR.md`（草案，`grammar_version` 0.0.1；取舍与缺口见 `docs/DECISIONS.md` D-016）。
+- P0 规范化 IR（`ir`（S5）那一行的规格）：`docs/IR.md`（草案，`ir_version` 0.0.1；op 表、`limits` 缺省值、`LB-I0xx` 码表、schema 位置；取舍与缺口见 `docs/DECISIONS.md` D-017）。
 - 硬件选型、电源、引脚：`docs/HARDWARE.md`（待验证）。
 - 任务拆分与依赖：`docs/ROADMAP.md`。
 - 决策与理由：`docs/DECISIONS.md`。

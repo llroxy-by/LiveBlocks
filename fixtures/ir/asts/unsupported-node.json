@@ -1,0 +1,70 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ast",
+  "frame_id": "f-ir-unsupported-node",
+  "grammar_version": "0.0.1",
+  "root": {
+    "node": "Program",
+    "span": {
+      "row_from": 0,
+      "row_to": 1,
+      "slot_from": 0,
+      "slot_to": 1
+    },
+    "body": [
+      {
+        "node": "Command",
+        "span": {
+          "row": 0,
+          "slot_from": 0,
+          "slot_to": 1
+        },
+        "name": "move-forward",
+        "args": [
+          {
+            "node": "Number",
+            "span": {
+              "row": 0,
+              "slot_from": 1,
+              "slot_to": 1
+            },
+            "value": 1,
+            "origin": {
+              "candidate_id": "c-2",
+              "card_face": "number-1"
+            }
+          }
+        ],
+        "origin": {
+          "candidate_id": "c-0",
+          "card_face": "move-forward"
+        }
+      },
+      {
+        "node": "Loop",
+        "span": {
+          "row": 1,
+          "slot_from": 0,
+          "slot_to": 0
+        },
+        "origin": {
+          "candidate_id": "c-1",
+          "card_face": "repeat"
+        }
+      }
+    ],
+    "origin": {
+      "candidate_ids": [
+        "c-0",
+        "c-2",
+        "c-1"
+      ],
+      "card_faces": [
+        "move-forward",
+        "number-1",
+        "repeat"
+      ]
+    }
+  },
+  "diagnostics": []
+}
