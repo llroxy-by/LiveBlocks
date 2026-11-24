@@ -28,6 +28,13 @@
   - ``liveblocks exec run --ir <json>``   ``Ir`` → 事件流（§7.1）+ ``ExecResult``（§7.2）+ 最终状态 JSON
   - ``liveblocks exec report``            对 ``fixtures/exec`` 真跑一遍并打印验收对照（含实测耗时）
 
+- LB-009：``e2e`` 子命令组（端到端回归与运行记录）：
+
+  - ``liveblocks e2e run --scene all --out runs/e2e``  一条命令跑「生成 → 识别 → 排列 → 解析 →
+    IR → 模拟」全链路，把 §8 运行记录（JSONL：``RunHeader`` + 逐层对象 + 事件）落盘
+  - ``liveblocks e2e regression --dir fixtures/e2e``   全场景回归：记录形状校验 + 黄金基准比对 +
+    破坏注入自检 + 固定时间上界；失败时打印失败摘要并点名到「最早失败层」
+
 - LB-008：``ui`` 子命令组（调试视图，**只读**消费 §8 运行记录）：
 
   - ``liveblocks ui view --record <jsonl>``    一屏五层视图（文本 / 自包含 HTML / 叠加 PNG）
@@ -61,6 +68,10 @@ DEFAULT_IR_DIR = Path("fixtures/ir")
 DEFAULT_EXEC_DIR = Path("fixtures/exec")
 #: LB-008 的运行记录目录（§8 JSONL + 清单，见 ``fixtures/README.md`` §8）。
 DEFAULT_RUN_DIR = Path("fixtures/runs")
+#: LB-009 的黄金基准目录（``baseline.json``，见 ``fixtures/README.md`` §9）。
+DEFAULT_E2E_DIR = Path("fixtures/e2e")
+#: LB-009 的运行记录落盘目录（不入库：``timings_ms`` 是实测墙钟，每跑一次都不一样）。
+DEFAULT_E2E_OUT = Path("runs/e2e")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -316,6 +327,79 @@ def build_parser() -> argparse.ArgumentParser:
     )
     exec_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
     exec_report.set_defaults(handler=_cmd_exec_report)
+
+    # 破坏注入的目标清单只有一个出处（``liveblocks.e2e.protocol``），避免 CLI 与实现漂移。
+    from .e2e.protocol import CORRUPT_TARGETS as E2E_CORRUPT_TARGETS
+
+    e2e = subparsers.add_parser(
+        "e2e",
+        help="端到端回归（LB-009）：一条命令跑全链路并落盘 §8 运行记录",
+        description=(
+            "跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」全链路，把 §8 运行记录写成 JSONL；"
+            "「回归」子命令另外做记录形状校验、黄金基准比对、破坏注入自检与固定时间上界。"
+        ),
+    )
+    e2e_sub = e2e.add_subparsers(dest="e2e_command", required=True)
+
+    e2e_run = e2e_sub.add_parser(
+        "run", help="一条命令跑全链路，把运行记录写到 --out（默认 runs/e2e）"
+    )
+    e2e_run.add_argument(
+        "--scene", default="all", help="场景预设名，逗号分隔；all 表示全部预设（默认 all）"
+    )
+    e2e_run.add_argument("--seed", type=int, default=DEFAULT_SEED, help=f"随机种子（默认 {DEFAULT_SEED}）")
+    e2e_run.add_argument(
+        "--out", type=Path, default=DEFAULT_E2E_OUT, help=f"记录输出目录（默认 {DEFAULT_E2E_OUT}）"
+    )
+    e2e_run.add_argument(
+        "--corrupt",
+        choices=E2E_CORRUPT_TARGETS,
+        default="none",
+        help="破坏注入（只用于证明回归不是假通过）：scene-image 抹平生成图，层名删该层一个必填字段",
+    )
+    e2e_run.set_defaults(handler=_cmd_e2e_run)
+
+    e2e_regression = e2e_sub.add_parser(
+        "regression",
+        help="全场景回归：形状校验 + 黄金基准比对 + 破坏注入自检 + 固定时间上界",
+    )
+    e2e_regression.add_argument(
+        "--dir", type=Path, default=DEFAULT_E2E_DIR, help=f"黄金基准目录（默认 {DEFAULT_E2E_DIR}）"
+    )
+    e2e_regression.add_argument(
+        "--out", type=Path, default=DEFAULT_E2E_OUT, help=f"记录输出目录（默认 {DEFAULT_E2E_OUT}）"
+    )
+    e2e_regression.add_argument(
+        "--scene",
+        default=None,
+        help="只跑这些场景（逗号分隔；默认跑基准里的全部场景）",
+    )
+    e2e_regression.add_argument(
+        "--seed", type=int, default=None, help=f"随机种子（默认用基准里记的 {DEFAULT_SEED}）"
+    )
+    e2e_regression.add_argument(
+        "--corrupt",
+        choices=E2E_CORRUPT_TARGETS,
+        default="none",
+        help="对全部场景注入同一种破坏（期望回归失败并点名到层）",
+    )
+    e2e_regression.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="用当前代码重跑并重写 --dir/baseline.json（黄金基准）",
+    )
+    e2e_regression.add_argument(
+        "--no-self-check",
+        action="store_true",
+        help="不做破坏注入自检（默认会跑一次，证明「破坏会被抓到」）",
+    )
+    e2e_regression.add_argument(
+        "--no-write",
+        action="store_true",
+        help="只比对，不把运行记录写到 --out",
+    )
+    e2e_regression.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    e2e_regression.set_defaults(handler=_cmd_e2e_regression)
 
     ui = subparsers.add_parser(
         "ui",
@@ -868,6 +952,71 @@ def _cmd_exec_report(args: argparse.Namespace) -> int:
         )
         print(f"报告已写入 {args.json}")
     return 0 if all(ok for ok, _criterion, _evidence in report.acceptance()) else 1
+
+
+def _cmd_e2e_run(args: argparse.Namespace) -> int:
+    """一条命令跑全链路：每个场景一份 §8 记录，退出码 0 = 全部记录形状合格。"""
+    from .e2e import run_chain, validate_record
+
+    names = _resolve_scenes(args.scene)
+    failures = 0
+    for scene in names:
+        run = run_chain(scene, out_dir=args.out, seed=args.seed, corrupt=args.corrupt)
+        issues = validate_record(
+            run.documents,
+            scene=scene,
+            image_exists=lambda ref, out=args.out: (Path(out) / ref).is_file(),
+        )
+        print(
+            f"{scene:<16} {run.summary()}  记录 {len(run.documents)} 行 → {run.record_path}"
+        )
+        print(
+            f"{'':<16} 分层耗时（实测，不是性能结论）："
+            + "，".join(f"{stage} {value:g} ms" for stage, value in run.timings.items())
+            + f"；整条 {run.wall_ms:g} ms"
+        )
+        for note in run.notes:
+            print(f"{'':<16} ! {note}")
+        for entry in issues:
+            failures += 1
+            print(f"{'':<16} ! {entry.describe()}", file=sys.stderr)
+    print(f"共 {len(names)} 个场景，记录写到 {args.out}")
+    return 0 if failures == 0 else 1
+
+
+def _cmd_e2e_regression(args: argparse.Namespace) -> int:
+    """全场景回归：打印逐场景结论 + 破坏注入自检 + 验收对照 + 失败摘要。"""
+    import json
+
+    from .e2e import BaselineError, ChainError, build_report, format_report
+
+    scenes = None
+    if args.scene:
+        scenes = [part.strip() for part in args.scene.split(",") if part.strip()]
+    try:
+        report = build_report(
+            args.dir,
+            out_dir=args.out,
+            scenes=scenes,
+            seed=args.seed,
+            corrupt=args.corrupt,
+            write_records=not args.no_write,
+            self_check=not args.no_self_check,
+            update_baseline=args.update_baseline,
+        )
+    except (BaselineError, ChainError, ValueError) as error:
+        # 基准缺失/形状不对、场景不存在、--update-baseline 与 --corrupt 同时给：都只是「跑不起来」。
+        print(f"端到端回归无法开始：{error}", file=sys.stderr)
+        return 1
+
+    print(format_report(report), end="")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if report.passes() else 1
 
 
 def _cmd_ui_view(args: argparse.Namespace) -> int:

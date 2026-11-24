@@ -66,3 +66,23 @@ def recognized() -> dict[str, tuple[object, dict]]:
         result = recognize_path(SCENES_DIR / f"{name}.png", registry=registry)
         results[name] = (result, truth)
     return results
+
+
+# --- LB-009 端到端回归的公共夹具（全链路单次约 1 秒，按 session 缓存） ---------------
+
+#: LB-009 的黄金基准目录。
+E2E_DIR = FIXTURES_DIR / "e2e"
+
+
+@pytest.fixture(scope="session")
+def e2e_out_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """运行记录的落盘目录（不入库：``timings_ms`` 是实测墙钟，每跑一次都不一样）。"""
+    return tmp_path_factory.mktemp("e2e-out")
+
+
+@pytest.fixture(scope="session")
+def e2e_normal_run(e2e_out_dir: Path, context: SynthContext):
+    """``normal`` 场景真跑一遍全链路的结果（记录已落盘）。"""
+    from liveblocks.e2e import run_chain
+
+    return run_chain("normal", out_dir=e2e_out_dir, context=context)

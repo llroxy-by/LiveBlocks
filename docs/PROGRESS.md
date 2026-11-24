@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-008 调试视图：§8 运行记录 → 一屏五层（帧叠加 / 排列 / AST / IR / 事件流 + 分层耗时）+ 回放与单步，PR 见本仓库 `agent/lb-debug-ui-*` 分支）
+> 最近更新：2026-11-24（LB-009 端到端回归与运行记录：`liveblocks e2e run` 一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 JSONL；`liveblocks e2e regression` 做记录形状校验 + 指纹式黄金基准 + 破坏注入自检 + 固定时间上界，PR 见本仓库 `agent/lb-e2e-regression-*` 分支）
 
 ## 1. 已验证
 
@@ -92,15 +92,24 @@
 | LB-008 测试与本地检查 | `bash scripts/check.sh`（Python 3.14.4 / pytest 9.2.0）→ `843 passed, 2 skipped in 96.68s`、`==> 检查通过`，退出码 0（基线 684 例 → 新增 159 例：`tests/test_ui_record.py` 32、`test_ui_replay.py` 32、`test_ui_render.py` 22、`test_ui_fixtures.py` 22、`test_ui_cli.py` 12、`test_ui_docs.py` 39）；跳过的 2 项与 LB-002/LB-003 相同（只有装 OpenCV 才跑的交叉核对） | LB-008 PR |
 | LB-008 CI 对 PR 显示检查结果 | PR #21 的 `ci` 工作流（run 45313026155，commit 3263872）两个矩阵任务均通过：`check (python 3.11)` pass（2m12s）、`check (python 3.13)` pass（1m11s），各自执行 `bash scripts/check.sh` 并以「==> 检查通过」结束；跳过的 2 项与 LB-002/LB-003 相同（只有装 OpenCV 才跑的交叉核对） | LB-008 PR #21 |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，**LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim），以及 **LB-008 调试视图**在 `fixtures/runs` 运行记录上的五层同屏 / 两次回放一致 / 坏记录可见提示 / 真实渲染截图四项结论；**仍未包含运行记录的「生产」**（LB-009 起：一条命令跑全链路并落盘 §8 记录），也没有任何真实摄像头 / 实体卡片 / 硬件的证据（见 §3）。
+| LB-009 端到端回归：一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」全链路，并把 §8 运行记录落盘（JSONL） | 实现见 `src/liveblocks/e2e/`（`protocol.py` 六阶段模型/记录形状校验/`LB-E0xx` 码表、`pipeline.py` 全链路编排、`record.py` JSONL 读写与层指纹、`baseline.py` 黄金基准、`regression.py` 回归与失败摘要、`docs.py` 文档核对）；`python -m liveblocks e2e run --scene all --out runs/e2e` → 6 个场景各一份记录（`clipped` 10 行，其余各 8 行，共 50 行），退出码 **0**；`python -m liveblocks e2e regression --dir fixtures/e2e --out runs/e2e` → 6 个场景全部 `OK`、五条验收对照全「通过」，退出码 **0** | LB-009 PR |
+| LB-009 运行记录包含全部层的 `kind` 且有 `RunHeader` | 每份记录第 1 行都是 `RunHeader`（`run_id` / `backend: "sim"` / `scene` / `frame` / 加法式 `generation` / 六阶段 `timings_ms` / `created_with`），随后按 §8 产出顺序写 `MarkerCandidateList` → `CardCandidateList` → `Layout` → `Ast` → `Ir` → `ExecEvent`* → `ExecResult`；回归验收行证据为「kind 覆盖 7 种：MarkerCandidateList、CardCandidateList、Layout、Ast、Ir、ExecEvent、ExecResult；每份记录第一行都是 RunHeader（形状问题 0 条）」；`tests/test_e2e_protocol.py`（26 例）逐条反证 `LB-E001`…`LB-E009` 的触发路径 | LB-009 PR |
+| LB-009 人为破坏一个 fixture 时回归明确失败并指出层级 | 回归默认做一次破坏注入自检：`python -m liveblocks e2e regression --dir fixtures/e2e --out runs/e2e` 打印「破坏注入自检：破坏注入 scene-image（场景 clipped）→ 被抓到，最早失败层 生成（synth）」并附首条 `LB-E010`（图像 sha256 期望 `ef8f6e370a14`，实得 `8ab9e30f991f`）；手工复现 `--scene normal --corrupt layout` → 退出码 **1**，失败摘要「最早失败层：layout —— 排列（layout）」+「`LB-E006 error [normal/layout] 第 4 行: 第 4 行的 Layout 缺字段：rows`」+「复现：…`--corrupt layout`」；若比对被改成永真式则报 `LB-E012`（回归是假通过）；`tests/test_e2e_regression.py` 对 5 个层各验一次「点名到被破坏的那一层」，`tests/test_e2e_pipeline.py` 另验「破坏只影响该层指纹」 | LB-009 PR |
+| LB-009 回归在固定时间内完成 | 上界写死为整份回归 **60000 ms**、单条记录 **20000 ms**（`TIME_BOUND_MS` / `RECORD_BOUND_MS`），超了报 `LB-E011` 并判失败；实测整份回归 **9820.8 ms**（6 场景 + 一次破坏自检），单条最长 2032 ms（`multi-row`）；`tests/test_e2e_regression.py::test_regression_stays_within_the_fixed_time_bound` 断言实测 ≤ 上界，另有两个用例把上界压到 0.001 ms 反证 `LB-E011` 真的会触发 | LB-009 PR |
+| LB-009 黄金样例基准（`fixtures/e2e/baseline.json`） | 6 个场景 × 六阶段：每层文档的 `sha256(canonical JSON)` 指纹、`kind` 序列、行数、关键计数、生成图像/真值 sha256 与两个时间上界；**不含**实测耗时，因此基准确定性：`--update-baseline` 重算一次与入库文件**逐字节相同**（12733 字节，`tests/test_e2e_regression.py::test_baseline_matches_a_fresh_run`）；手改某一层指纹 → 回归失败并点名该层（`LB-E010`），删掉一个场景 → `LB-E013` | LB-009 PR |
+| LB-009 生成层复现 LB-002 的入库 fixtures | 全链路的起点是**真生成**：`run_chain` 按种子 `20261123` 生成 PNG + 真值并落盘，识别从磁盘读这张图；6 个场景的 `image_sha256` / `ground_truth_sha256` 与 `fixtures/scenes/*` **逐字节相同**（回归报告证据「生成层复现 LB-002 入库 fixtures 6/6」，`tests/test_e2e_pipeline.py::test_generation_reproduces_the_lb002_fixture_byte_for_byte`） | LB-009 PR |
+| LB-009 记录的生产不依赖 LB-008 的临时脚本 | 记录的生产全在包内（`src/liveblocks/e2e/`），`pipeline.py`/`record.py`/`baseline.py`/`regression.py`/`protocol.py` 的 AST 里没有任何指向 `scripts/` 或 `build_run_records` 的 import 与字符串常量（`tests/test_e2e_pipeline.py::test_production_does_not_depend_on_the_lb008_scripts`，另有反向验证用例证明该守卫会失败）；`scripts/build_run_records.py` 仍只为 `fixtures/runs` 的夹具服务，本单未改它 | LB-009 PR |
+| LB-009 记录可直接交给 LB-008 的调试视图 | `python -m liveblocks ui view --record runs/e2e/clipped.jsonl` → 「层=7/7 事件=3 问题=0（error 0 / warning 0）」「五层：vision=有、layout=有、ast=有、ir=有、exec=有」，退出码 0；`tests/test_e2e_record.py` 断言 `parse_record_file` 一条问题都不报、`build_view_from_file` 五个面板齐全——跨层兼容性用真实产物证明 | LB-009 PR |
+| LB-009 端到端回归层测试与本地检查 | `PYTHON=/tmp/lb-e2e-venv/bin/python bash scripts/check.sh` → `compileall` 通过、`992 passed, 3 skipped in 137.20s`、`==> 检查通过`，退出码 0（Python 3.14.4 / pytest 9.0.2；跳过的 3 项是只有装 OpenCV / jsonschema 才跑的可选交叉核对）；新增 150 例：`tests/test_e2e_docs.py` 56、`tests/test_e2e_protocol.py` 26、`tests/test_e2e_regression.py` 24、`tests/test_e2e_pipeline.py` 19、`tests/test_e2e_record.py` 15、`tests/test_e2e_cli.py` 10 | LB-009 PR |
+
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，**LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim），以及 **LB-008 调试视图**在 `fixtures/runs` 运行记录上的五层同屏 / 两次回放一致 / 坏记录可见提示 / 真实渲染截图四项结论，以及 **LB-009 端到端回归与运行记录**在 `fixtures/e2e` 黄金基准上的「一条命令跑六阶段 / 记录形状合格 / 破坏注入被抓到并点名到层 / 固定时间上界」四项结论；运行记录的「生产」已经落在 `src/liveblocks/e2e/`（不再依赖任何拼记录的脚本）。**仍没有任何真实摄像头 / 实体卡片 / 硬件的证据**（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-008 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库里已有骨架、合成卡片生成器、识别模块、排列层、语法层、规范化层、**模拟**执行器与调试视图，但**还没有运行记录的生产**：`fixtures/runs` 的记录目前由脚本把各层真跑一遍拼出来，全链路一条命令落盘仍属 LB-009）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-009 已完成并迁至 §1「已验证」（P0 软件 MVP 的 9 条已全部落地：一条命令跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」并落盘 §8 运行记录）；其余条目尚未开始（LB-010 起的硬件任务需要人授权与实测）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-009 | 端到端回归与运行记录 | 计划中 |
 | LB-021 | 交付与打包 | 计划中（依赖 LB-020） |
 
 尚未决的 Q1–Q10 见 `docs/ARCHITECTURE.md` §4 与 `docs/DECISIONS.md` 末表；它们只影响「怎么做」，不改变上述计划项的存在。
@@ -122,7 +131,15 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有「运行记录的生产」，也没有接硬件**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层、LB-006 规范化层、LB-007 模拟执行器与 **LB-008 调试视图**（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收、8 个 IR 夹具的 golden 快照验收、8 个执行夹具的事件流/最终状态验收，以及 `fixtures/runs` 9 份运行记录上的五层同屏 + 两次回放一致 + 坏记录可见提示 + 真渲染截图）。但**一条命令跑全链路并落盘 §8 运行记录仍属 LB-009**（`fixtures/runs` 的记录现在由 `scripts/build_run_records.py` 把各层真跑一遍拼出来）；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013）。
+- **软件闭环（P0）已经跑通并被回归守住，但还没有接硬件**：一条命令 `liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并落盘 §8 运行记录，`liveblocks e2e regression` 用记录形状 + 指纹式黄金基准 + 破坏注入自检 + 固定时间上界把它守住；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013），也没有任何真实摄像头 / 实体卡片的证据。
+- **LB-009 已知限制（详见 `docs/DECISIONS.md` D-020 与 `docs/E2E.md`）**：
+  1. **记录不入库**：`runs/e2e` 在 `.gitignore` 里——`RunHeader.timings_ms` 是记录时实测的墙钟耗时，每跑一次都不一样；入库的是**黄金基准**（每层文档的指纹、`kind` 序列、行数、计数）与记录形状的约定；
+  2. **只跑合成图**：`backend` 恒为 `sim`，生成层是 LB-002 的合成卡片图（6 个入库场景），不接真实摄像头、不做标定；模拟通过 ≠ 硬件验证；
+  3. **时间上界不是性能基线**：60 s / 20 s 只保证「别挂死」；实测值（整份约 9–11 s，瓶颈是生成层的纯 Python 光栅化）只作证据，不进基准；
+  4. **`--corrupt` 是自检开关**：注入方式确定（抹平生成图 / 删该层一个必填字段），不支持按场景分别注入；`--no-self-check` 会让「破坏时回归会失败并点名到层」这条验收显示未通过（退出码 1），这是刻意的；
+  5. **失败定位取「最早一层」**：破坏发生在哪层，下游都是后果，所以只点名最上游的一层；如果同一次破坏在多处出现（例如手改基准 + 上游层变更），摘要仍只给最早那层，其余逐条列在后面。
+- **LB-009 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/e2e/`，LB-010 起的条目原样保留）。
+- **LB-009 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-020 —— §8 没有 `RunHeader` 必填字段、没有「生成层」的位置（`synth` 的 PNG + 真值只能挂在 `RunHeader.generation` 上）、没有分层耗时容器、没有「记录不合格」的错误模型（本层新增 `LB-E0xx`）、没规定时间戳与图像路径基准、没规定「一次运行多个场景」怎么落盘。
 - **LB-008 已知限制（详见 `docs/DECISIONS.md` D-019 与 `docs/UI.md`）**：
   1. **视图只读、不重跑业务层**：记录里没有的层不会被补出来（缺层显示占位 + `LB-U004`），这是「看到的就是落盘的证据」的代价；
   2. **单步 = 命令行 `--step N`**：没有交互式前端，HTML 里没有脚本（离线可开、便于截图），因此「点击单步」这类交互不属本阶段；
@@ -138,7 +155,7 @@
   2. **P0 的 IR 没有控制流**（D-016 第 1 条），所以验收里的「死循环样例」只能用两种**等价运行形态**表示——步骤数超过 `max_steps`、虚拟耗时超过 `timeout_ms`；本层没有、也不该有「真的循环执行」；
   3. **世界状态是 P0 占位语义**（`pos` / `facing` / `holding` / `jumps` 的最小网格模型），只为让事件 `detail.state_delta` 与最终状态 JSON 有内容；空手 `drop` 报 `LB-R005` 也是占位检查，Q5 定稿后可能整体改写（改写要提升 `exec_version` 并重生成 `fixtures/exec` 的 golden）；
   4. **`LB-R001` 没有夹具**：它是防御路径（§6 的 `op` 只能来自文法定义，合法 `Ir` 走不到），只有单元测试覆盖；`parse_error` 本层永不产出（输入已是 `Ir`）；
-  5. 事件流只是「事件流」，不是 §8 的完整运行记录（缺 `RunHeader` 与各层打包，属 LB-009）。
+  5. 事件流只是「事件流」，不是 §8 的完整运行记录（缺 `RunHeader` 与各层打包——这部分由 LB-009 的 `liveblocks e2e run` 补上，本层不产出记录）。
 - **LB-007 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/runtime/`，LB-008 起的条目原样保留）。
 - **LB-007 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-018 —— §7 没有一步的虚拟耗时与 `tick` ↔ 毫秒换算、没有 `limits` 判定顺序与边界、没有「超时是墙钟还是虚拟时钟」、`parse_error` 对执行器无意义、没有「最终状态」对象（本层加 `ExecState`）、`step_id` 没有「不绑定步骤」的写法、§9 只举了 `LB-R002`/`LB-R003`、没说 `detail` 里放什么、没说中断怎么触发与留痕。
 - **LB-003 只在合成图上验证过**：所有识别结论都来自 LB-002 的合成灰度图（无镜头畸变、无运动模糊）。真实摄像头的鲁棒性（反光、阴影、透视更大、运动模糊）没有证据，属 LB-010/LB-020。

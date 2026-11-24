@@ -249,7 +249,54 @@ fixtures/runs/
   `docs/evidence/lb-008-debug-view.png` 等四张，由 `scripts/screenshot_view.py` 用 WebKitGTK + Xvfb
   把 `liveblocks ui view --html-out` 的 HTML 真渲染得到，**不是 mock-up**。
 
-## 9. 约定
+## 9. `e2e/`（LB-009 黄金基准）
+
+端到端回归（LB-009）的**基准**，不是记录本身。运行记录是**运行时产物**，写到 `runs/e2e/`
+（不入库）：`RunHeader.timings_ms` 是记录时实测的墙钟耗时，每跑一次都不一样，入库会让
+「重跑一致」变成假命题。入库的是「每层应该是什么样」的指纹：
+
+```
+fixtures/e2e/
+└── baseline.json     # kind=E2eBaseline：6 个场景 × 六阶段的指纹、kind 序列、行数、计数
+```
+
+`baseline.json` 的结构：
+
+| 字段 | 含义 |
+| --- | --- |
+| `seed` | 生成用的随机种子（`20261123`，与 `liveblocks synth` 同一个） |
+| `time_bound_ms` / `record_bound_ms` | 固定时间上界：整份回归 60000 ms / 单条记录 20000 ms |
+| `note` | 指纹口径（canonical JSON + sha256，不含实测耗时） |
+| `scenes[].image_sha256` | 生成层产出的 PNG 的 sha256（与 `scenes/<名>.png` **逐字节相同**） |
+| `scenes[].ground_truth_sha256` | 生成层产出的真值 JSON 的 sha256 |
+| `scenes[].layers.<阶段>.sha256` | 该阶段层文档的指纹：`sha256(canonical JSON(doc, 键排序) + 换行)` |
+| `scenes[].layers.<阶段>.kinds/lines` | 该阶段的 `kind` 序列与行数 |
+| `scenes[].counts` | 每阶段的关键计数（标记/卡片/行/语句/步/事件/状态） |
+
+- 基准只由命令生成，**不要手改**（手改会被回归当场抓住：`LB-E010` 与「最早失败层」点名）。
+
+  ```bash
+  liveblocks e2e regression --dir fixtures/e2e --update-baseline
+  ```
+
+- 只校验、落盘记录到 `runs/e2e`（退出码 0 = 全过）：
+
+  ```bash
+  liveblocks e2e regression --dir fixtures/e2e --out runs/e2e
+  ```
+
+- 一条命令跑全链路并落盘记录（单场景 / 全部场景）：
+
+  ```bash
+  liveblocks e2e run --scene normal --out runs/e2e
+  ```
+
+- 改了上游层（识别/排列/语法/IR/执行）就会让指纹变化：那是**预期的**，重新生成基准并在 PR 里
+  说明 diff（`docs/E2E.md` §3）。
+- 生成层复现了 `scenes/` 的入库图（同种子 → 同字节），所以基准里的 `image_sha256` 与
+  `fixtures/scenes/*.png` 的 sha256 相同；`tests/test_e2e_pipeline.py` 逐字节断言这件事。
+
+## 10. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

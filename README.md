@@ -6,7 +6,8 @@
 
 - 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**、**LB-005 语法解析**、**LB-006 规范化 IR**、**LB-007 模拟执行器** 与 **LB-008 调试视图**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片），再把 `Ast` 规范化成符合协议 §6 的 `Ir`（确定性输出、显式 `limits`、`op` 按 op 表校验，问题报 `LB-I0xx` 并通过入库 JSON Schema 校验），最后用**模拟执行器**把 `Ir` 跑成协议 §7 的 `ExecEvent[]` + `ExecResult`（虚拟时钟、来自 IR 的步数/超时限制、步骤边界中断，事件一律 `backend:"sim"`），并附一份可读的最终状态 JSON。
 - **LB-008 调试视图**可以把一份 §8 运行记录（JSONL）渲染成**一屏五层**：帧叠加（原帧 + 标记框 / 卡片中心 / 槽位）、排列、AST、IR、事件流 + 分层耗时，支持**回放**与**单步**；坏记录只给可见的 `LB-U0xx` 提示而不崩溃。它**只读**、只服务开发者，不做产品级 UI、不对外发布。
-- **运行记录的「生产」还没做**（LB-009 起）：目前 `fixtures/runs/` 里的记录由 `scripts/build_run_records.py` 把已有各层真跑一遍拼出来，还没有「一条命令跑全链路并落盘 §8 记录」的能力；**模拟通过 ≠ 硬件验证**，识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
+- **LB-009 端到端回归**把整条软件闭环收成一条命令：`liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并把 §8 运行记录落盘，`liveblocks e2e regression` 再做记录形状校验、**黄金基准**比对、**破坏注入自检**与**固定时间上界**（整份 ≤ 60 s、单条记录 ≤ 20 s），失败时打印失败摘要并点名「最早失败层」。运行记录的生产在包内完成，不依赖 LB-008 为夹具拼记录的脚本。
+- **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -245,7 +246,35 @@ liveblocks ui report --dir fixtures/runs
   `docs/evidence/lb-008-debug-view.png`、`docs/evidence/lb-008-debug-view-step0.png`、
   `docs/evidence/lb-008-debug-view-all-ops.png`、`docs/evidence/lb-008-corrupt-record.png`。
 - 界面规范与 `LB-U0xx` 码表见 [docs/UI.md](docs/UI.md)（草案 `ui_version` 0.0.1），
-  取舍与 `PROTOCOL.md` §8/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-020。
+  取舍与 `PROTOCOL.md` §8/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-019。
+
+## 端到端回归与运行记录（LB-009）
+
+一条命令跑全链路（**生成**合成卡片图 → **识别** → **排列** → **解析** → **IR** → **模拟执行**），
+把 §8 运行记录写成 JSONL：首行 `RunHeader`（含帧引用、生成层证据与六阶段实测耗时），
+随后 `MarkerCandidateList` / `CardCandidateList` / `Layout` / `Ast` / `Ir` / `ExecEvent`* / `ExecResult`。
+
+```bash
+# 一条命令跑全链路（默认全部场景），记录落到 runs/e2e（不入库：耗时是实测值）
+liveblocks e2e run --scene normal --out runs/e2e
+
+# 全场景回归：记录形状 + 黄金基准 + 破坏注入自检 + 固定时间上界；退出码 0 = 全过
+liveblocks e2e regression --dir fixtures/e2e --out runs/e2e
+
+# 手工复现「破坏一个 fixture → 回归明确失败并指出层级」
+liveblocks e2e regression --dir fixtures/e2e --scene normal --corrupt layout
+
+# 记录可以直接交给调试视图打开
+liveblocks ui view --record runs/e2e/normal.jsonl
+```
+
+当前实测（`fixtures/e2e`，6 个入库场景）：六个阶段全部真跑，记录 8–10 行/份，共 50 行；
+生成层的 PNG 与真值跟 `fixtures/scenes/*` **逐字节相同**（同种子 → 同字节）；
+整份回归约 9–11 秒（上界 60 秒，瓶颈是生成层的纯 Python 光栅化）。
+黄金基准 `fixtures/e2e/baseline.json` 只记「每层文档的 canonical JSON + sha256 指纹、`kind` 序列、
+行数与关键计数」，**不记**实测耗时，因此重跑 `--update-baseline` 得到逐字节相同的文件。
+规范与 `LB-E0xx` 码表见 [docs/E2E.md](docs/E2E.md)（草案 `e2e_version` 0.0.1），
+取舍与 `PROTOCOL.md` §8/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-020。
 
 ## 文档入口
 
@@ -258,6 +287,7 @@ liveblocks ui report --dir fixtures/runs
 | [docs/IR.md](docs/IR.md) | P0 规范化 IR 规范（op 表、`args`/`limits`/`step_id` 约定、`LB-I0xx` 码表、schema），**草案** | 草案 v0.0.1（`ir_version` 0.0.1） |
 | [docs/EXEC.md](docs/EXEC.md) | S6 模拟执行层规范（虚拟时钟、op 语义表、limits 判定顺序、中断、`LB-R0xx` 码表、`ExecState`），**草案** | 草案 v0.0.1（`exec_version` 0.0.1） |
 | [docs/UI.md](docs/UI.md) | S7b 调试视图规范（一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表），**草案** | 草案 v0.0.1（`ui_version` 0.0.1） |
+| [docs/E2E.md](docs/E2E.md) | 端到端回归规范（六阶段链路、§8 记录的生产、黄金基准、失败摘要、固定时间上界、`LB-E0xx` 码表），**草案** | 草案 v0.0.1（`e2e_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
