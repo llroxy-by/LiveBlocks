@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "ExecState",
+  "exec_version": "0.0.1",
+  "run_id": "run-drop-empty",
+  "backend": "sim",
+  "status": "runtime_error",
+  "steps_executed": 2,
+  "duration_ms": 20.0,
+  "limits": {
+    "max_steps": 1000,
+    "timeout_ms": 5000
+  },
+  "world": {
+    "pos": {
+      "x": 0,
+      "y": 0
+    },
+    "facing": "north",
+    "holding": 0,
+    "jumps": 0
+  },
+  "events": 7,
+  "last_seq": 7
+}

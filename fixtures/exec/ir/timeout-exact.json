@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [
+      {
+        "step_id": "s0",
+        "op": "wait",
+        "args": {
+          "duration": 100,
+          "unit": "tick"
+        },
+        "source": {
+          "row": 0,
+          "slot": 0
+        }
+      }
+    ],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 1000
+    }
+  },
+  "diagnostics": []
+}

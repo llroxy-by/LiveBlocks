@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Ir",
+  "ir_version": "0.0.1",
+  "program": {
+    "steps": [
+      {
+        "step_id": "s0",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 0,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s1",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 1,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s2",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 2,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s3",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 3,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s4",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 4,
+          "slot": 0
+        }
+      },
+      {
+        "step_id": "s5",
+        "op": "move-forward",
+        "args": {
+          "distance": 1,
+          "unit": "cell"
+        },
+        "source": {
+          "row": 5,
+          "slot": 0
+        }
+      }
+    ],
+    "limits": {
+      "max_steps": 1000,
+      "timeout_ms": 5000
+    }
+  },
+  "diagnostics": []
+}

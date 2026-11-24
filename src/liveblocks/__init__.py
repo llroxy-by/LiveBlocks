@@ -13,9 +13,12 @@
 - LB-005：语法层（:mod:`liveblocks.parser`），``Layout`` → ``Ast``（协议 §5），P0 最小文法
   「语句序列 + 字面参数」，错误报 ``LB-P0xx`` 并定位到行/槽位/卡片，**不求值、不执行**；
 - LB-006：规范化层（:mod:`liveblocks.ir`），``Ast`` → ``Ir``（协议 §6），确定性输出、
-  显式 ``limits``、op 表校验与入库 JSON Schema，问题报 ``LB-I0xx``，**不执行**。
+  显式 ``limits``、op 表校验与入库 JSON Schema，问题报 ``LB-I0xx``，**不执行**；
+- LB-007：模拟执行层（:mod:`liveblocks.runtime`），``Ir`` → ``ExecEvent[]`` + ``ExecResult``
+  + 最终状态（协议 §7），虚拟时钟、来自 IR 的 ``limits``、步骤边界中断，问题报 ``LB-R0xx``；
+  **只有 ``backend: "sim"``**，不接硬件、不做界面。
 
-执行器与界面按 ``docs/ROADMAP.md`` 的 LB-007 起逐条加入，并各自带测试。
+界面与运行记录按 ``docs/ROADMAP.md`` 的 LB-008 / LB-009 起加入，并各自带测试。
 """
 
 from __future__ import annotations

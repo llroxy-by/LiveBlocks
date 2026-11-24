@@ -426,6 +426,84 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
 - **待办**：协议冻结前把上面 8 条并进 §6/§9（由仓库所有者决定取舍）；Q5（语义模型）定了之后，
   若把 IR 改成表达式求值图，需要提升 `ir_version` 并重写 `docs/IR.md` 的 op 表与 `args` 形状。
 
+## D-018 LB-007 模拟执行：立即执行、虚拟时钟 10 ms/tick、limits 判定顺序、中断与 `LB-R0xx` 码表
+
+- **背景**：Issue #18 要求「`Ir` → `ExecEvent[]` + `ExecResult`，虚拟时钟，步数/超时限制，中断」，输出
+  符合 `docs/PROTOCOL.md` §7。但 §7 只给了两份文档的形状、三句约定（`phase` / `backend` 枚举、`seq`
+  严格递增、`status` 枚举）和一个示例：**没有**说一步占多少虚拟时间、`tick` ↔ 毫秒怎么换算、
+  `limits` 的判定顺序与边界（恰好用满算不算超）、超时是墙钟还是虚拟时钟、`detail` 里该放什么、
+  中断怎么表达（§7.2 只有 `aborted` 这个状态，没有触发方式），`§9` 的 `LB-R0xx` 也只举了
+  `LB-R002`（步数上限）与 `LB-R003`（超时）两个例子。Q5（语义模型）也仍未定。
+- **决策**（人类可读的定义见 `docs/EXEC.md`，机器可读的同一份在
+  `src/liveblocks/runtime/semantics.py` 与 `src/liveblocks/runtime/protocol.py`；
+  `tests/test_exec_docs.py` 与 `liveblocks exec report` 逐项核对两者一致）：
+  1. **P0 是立即执行**（Q5 的一半答案）：一步做完就写事件，不做求值图、不做并行、不做回溯。
+     `Ir` 是扁平步骤序列（D-016 第 1 条：P0 文法只有语句序列），因此「死循环」在 P0 里没有语法形态，
+     只有两种**等价运行形态**：步骤数超过 `max_steps`、虚拟耗时超过 `timeout_ms`。两者都由 `limits`
+     兜住，**不会挂死**；夹具 `non-terminating-steps` / `non-terminating-wait` 就是这两条，实测各
+     0.1 ms / 0.04 ms 结束。
+  2. **虚拟时钟 10 ms/tick**：`at_ms = Σ(cost_ticks) × 10`，不睡真实时间、不读墙钟。所有 `at_ms`
+     都是 10 的整数倍（浮点可精确表示），因此事件流可以逐字节比对。`wait 100000` 只是把时钟往前拨
+     1 000 000 虚拟毫秒，真实耗时仍是毫秒级——这是「死循环样例不挂死」与「测试总耗时在上限内」两条
+     验收的技术依据。
+  3. **op 语义表取最小可解释值**（`docs/EXEC.md` §2.3）：移动 2 tick、转向/跳跃/拿放各 1 tick、
+     `wait` = 它自己写的 `duration`。世界状态是**最小网格模型**（`pos` / `facing` / `holding` /
+     `jumps`），只为让 `finish` 事件的 `state_delta` 与最终状态 JSON 有内容；它**不是**产品语义，
+     Q5 定稿后可能整体改写（改它必须提升 `exec_version` 并重生成 golden）。
+  4. **`limits` 只读 IR**：`max_steps` / `timeout_ms` 从 `Ir.program.limits` 取（LB-006 已让它们显式
+     出现，缺省 1000 / 5000），本层不设第二个上限。判定顺序固定为 **中断 → 步数 → 语义 → 超时**，
+     四条都在**执行某一步之前**发生，因此被拒绝的那一步不会产出 `start`/`finish`、也不改世界状态。
+  5. **边界口径**：`steps_executed` 达到 `max_steps` 且**还有步骤**没跑 → `limit_exceeded`；恰好跑完
+     `max_steps` 步且程序结束 → `ok`。下一步的虚拟耗时会让总耗时**超过** `timeout_ms` → `timeout`；
+     总耗时**恰好等于** `timeout_ms` 且程序结束 → `ok`（夹具 `timeout-exact` 钉住这条边界）。
+     超时的虚拟时钟停在 `timeout_ms`（`duration_ms == timeout_ms`）。
+  6. **事件模型**：一次运行固定为「起步 `log` → 每步 `start` + `finish`（或被一条 `error` 截断）」，
+     因此 `n` 步成功运行有 `1 + 2n` 条事件。`seq` 从 1 开始严格递增，`at_ms` 单调不减。起步 `log`
+     事件把 `limits` / 步数 / 时钟换算写进事件流，使「限制来自 IR」在输出里是**可见事实**。
+     `detail` 按 `phase` 各有固定字段（`docs/EXEC.md` §3）。`step_id` 用空字符串表示「不绑定具体
+     步骤」（目前只有起步 `log` 事件这样写）。
+  7. **中断（`aborted`）**：两条入口，都只在**步骤边界**生效（不打断半步、不留半个 `state_delta`）：
+     `SimExecutor.request_abort()`（`threading.Event`，可跨线程）与 `should_abort(step_index,
+     elapsed_ms)` 回调（CLI 的 `--abort-at-step` / `--abort-at-ms`）。回调里调用 `request_abort()`
+     也在**同一边界**生效（不必等下一步）。中断后 `status=aborted`、一条 `LB-R004`（severity `info`）。
+  8. **`LB-R0xx` 码表**：`LB-R001` op 没有执行语义（防御路径：`Ir` 已按 D-017 校验，正常链路走不到，
+     但下游不该崩或挂死）、`LB-R002` 步数上限（沿用 §9 示例）、`LB-R003` 超时（沿用 §9 示例）、
+     `LB-R004` 被中断、`LB-R005` 手上没有物品还 `drop`（P0 网格模型的语义检查）。一次运行**最多一条**
+     诊断（第一次触发就结束，不做级联）；`ok` 没有诊断。诊断只放 `LB-R0xx`，**不复制**上游
+     `LB-I0xx` / `LB-P0xx`（各层诊断留在各层对象里）。
+  9. **新增 `ExecState`（最终状态 JSON）**：§7 没有「最终状态」对象，而验收要求「带一个可读的状态
+     输出」。本层加法式新增 `kind: ExecState`：`status` + `world`（`pos`/`facing`/`holding`/`jumps`）
+     + 回显的 `limits` + `events` / `last_seq` + `exec_version`。它是**新 `kind`**，协议是否收录由
+     仓库所有者决定（见下面缺口 4）。
+  10. **`ExecEvent` / `ExecResult` 严格照 §7.1 / §7.2**：不加字段，`status` 与 `phase` 的枚举原样，
+     §0 的「未知枚举值降级 `unknown`」在校验器里体现为额外接受 `unknown`。**`backend` 一律 `sim`**：
+     `validate_run()` 里写死「出现非 `sim` 事件即实现缺陷」，从代码层面杜绝「模拟冒充硬件」。
+  11. **确定性**：同一 `Ir` + 同一 `run_id` + 同一中断条件跑两次，事件流（JSONL）与最终状态（JSON）
+     逐字节一致；实测墙钟耗时（`SimRun.wall_ms`）只进报告，**不进**任何文档。序列化只走
+     `canonical_text()` / `events_jsonl()`。
+- **影响**：
+  - 执行层只吃 §6 的字段（`program.steps` + `program.limits`），因此夹具可以直接用 LB-006 的 golden
+    `Ir`（`fixtures/exec` 里 3 个夹具就是上游 golden），另 5 个是手写 `Ir`（现有 golden 凑不出
+    「步数用尽」「超时」「空手 `drop`」「中断」这些**执行期**形态）。
+  - 虚拟时钟意味着**「耗时」与真实时间脱钩**：`duration_ms` 是虚拟的，不能当性能数据；真实性能只有
+    `SimRun.wall_ms`（只进报告）。这一点必须写清楚，否则容易被读成「执行很快 = 真机也很快」。
+  - 因为世界状态是 P0 占位语义，`drop` 撞上空手会**报错而不是静默忽略**：`fixtures/exec/drop-empty`
+    就是如实结果。等 Q5 定稿后再决定这条检查是否保留。
+- **发现的协议缺口（本 PR 只报告、不改 `docs/PROTOCOL.md`）**：
+  1. §7 没说一步占多少虚拟时间，也没说 `tick` ↔ 毫秒的换算；本实现定为 10 ms/tick；
+  2. §7 没说 `limits` 的判定顺序、边界（恰好用完算不算超），也没说超时是墙钟还是虚拟时钟；
+  3. §7.2 的 `parse_error` 对执行器没有意义（输入已是 `Ir`），本层永不产出；建议协议注明
+     「`parse_error` 由上游生产者使用」；
+  4. §7 没有「最终状态」对象；本层新增 `ExecState`（新 `kind`），是否并入协议待定；
+  5. §7.1 的 `step_id` 没给「不绑定步骤」的写法；本层用空字符串表示（只有起步 `log` 事件）；
+  6. §9 只给了 `LB-R002` / `LB-R003`，`LB-R001` / `LB-R004` / `LB-R005` 由本实现按区间自增；
+  7. §7 没说 `detail` 里该放什么；本层按 `phase` 各给一组固定字段，建议并入协议；
+  8. §7 没说中断怎么触发、事件流里怎么留痕（只有 `status=aborted`）；本层用 `LB-R004` + `error`
+     事件补上。
+- **待办**：协议冻结前把上面 8 条并进 §7/§9（由仓库所有者决定取舍）；Q5（语义模型）定稿后重审
+  §2.3 的语义表与 `drop` 的语义检查——若要改成求值图或加控制流，必须提升 `exec_version`（并连带
+  `ir_version`）并重生成 `fixtures/exec` 的 golden。
+
 ## 待决问题索引（对应 `docs/ARCHITECTURE.md` §4）
 
 | 问题 | 内容 | 阻塞谁 |
@@ -434,7 +512,7 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
 | Q2 | 单标记 vs 四角标 | LB-003、LB-012 |
 | Q3 | 排列语义（单行/多行/棋盘） | LB-004 |
 | Q4 | 文法表达力 | LB-005（见 D-005、D-016） |
-| Q5 | 语义模型（立即执行 vs 求值图） | LB-006、LB-007 |
+| Q5 | 语义模型（立即执行 vs 求值图） | LB-006、LB-007（已按「立即执行」落地，见 D-018） |
 | Q6 | 首阶段反馈形态 | LB-008（见 D-007） |
 | Q7 | 摄像头安装与标定流程 | LB-010 |
 | Q8 | 运行记录格式与位置 | LB-009（见 D-009） |
