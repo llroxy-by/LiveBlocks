@@ -5,7 +5,7 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-007 模拟执行层：`Ir` → `ExecEvent[]` + `ExecResult` + `ExecState`，虚拟时钟 / limits / 中断，PR 见本仓库 `agent/lb-sim-executor-*` 分支）
+> 最近更新：2026-11-24（LB-008 调试视图：§8 运行记录 → 一屏五层（帧叠加 / 排列 / AST / IR / 事件流 + 分层耗时）+ 回放与单步，PR 见本仓库 `agent/lb-debug-ui-*` 分支）
 
 ## 1. 已验证
 
@@ -79,16 +79,26 @@
 | LB-007 模拟事件不冒充硬件证据 | `runtime.sim.validate_run()` 断言事件流 / `ExecResult` / `ExecState` 的 `backend` 全为 `sim`，出现 `hw` 即判实现缺陷；`tests/test_exec_sim.py::test_validate_run_catches_a_broken_stream`、`tests/test_exec_protocol.py::test_event_stream_rejects_mixed_backends`；`docs/EXEC.md` 首段与 §0 明写「模拟通过 ≠ 硬件验证」 | LB-007 PR |
 | LB-007 执行层文档与实现一致 | `docs/EXEC.md`（草案 `exec_version` 0.0.1：语义表、时钟换算、limits 判定顺序、中断、`LB-R0xx` 码表、`ExecState`、8 条协议缺口）；`runtime_document_gaps` 对入库文档返回 0 项缺口，`exec report` 打印「执行层文档缺口 0 项」；`tests/test_exec_docs.py`（21 例，含「文档命令块里的 `--ir`/`--dir` 路径真实存在」两条）含 8 类**反向验证**（删一行语义表 / 改耗时列 / 改状态影响 / 删一个诊断码 / 改码标题 / 改时钟换算 / 删枚举取值后必须报缺口） | LB-007 PR |
 | LB-007 执行层测试与本地检查 | `bash scripts/check.sh` → `collected 685 items / 1 skipped`、`684 passed, 2 skipped in 77.89s`（本 commit 上另一次运行为 78.37s）、`==> 检查通过`，退出码 0；新增执行层 152 例：`tests/test_exec_protocol.py` 49、`tests/test_exec_sim.py` 31、`tests/test_exec_fixtures.py` 38、`tests/test_exec_cli.py` 13、`tests/test_exec_docs.py` 21；跳过的 2 项与 LB-002/LB-003 相同（只有装 OpenCV 才跑的交叉核对） | LB-007 PR |
+| LB-008 调试视图：一屏五层（帧叠加 / 排列 / AST / IR / 事件流 + 分层耗时），从 §8 运行记录驱动，支持回放与单步 | 实现见 `src/liveblocks/ui/`（`protocol.py` 面板/码表/最小字段校验、`record.py` JSONL 容错解析、`replay.py` 事件折叠时间线、`raster.py` 叠加光栅、`render.py` 一屏渲染、`evidence.py` 截图统计、`docs.py` 文档核对、`report.py` 自检报告）；`python -m liveblocks ui view --record fixtures/runs/sample-clipped.jsonl` 打印文本视图（五层齐全、问题 0 条），`ui report --dir fixtures/runs` 打印 9 份夹具逐条结论 + 四条验收对照，退出码 0 | LB-008 PR |
+| LB-008 打开样例运行记录可看到五层数据同时呈现 | 第一条验收「通过」；`fixtures/runs/sample-clipped.jsonl`（真实全链路：识别 → 排列 → 语法 → IR → 模拟执行，1 步 / 3 条事件）与 `sample-multi-row.jsonl`（两行六卡，含 `LB-P002`/`LB-P004` 语法诊断）两份记录的 `view.complete_layers` 都等于五层；渲染出的 HTML 里五个 `<section class="panel" data-layer="…">` 面板都存在且有内容（帧叠加面板内嵌 base64 PNG、排列/IR/事件流是表格、AST 是树、分层耗时是条形图）；WebKitGTK 实测面板矩形（1440×1046 页面）：`vision 565×548 @(12,129)`、`layout 418×548 @(585,129)`、`ast 418×548 @(1010,129)`、`ir 565×322 @(12,685)`、`exec 843×322 @(585,685)`，全部非零面积；`tests/test_ui_render.py::test_all_five_layers_appear_in_one_html_page`、`test_panels_have_real_content` | LB-008 PR |
+| LB-008 回放同一记录两次结果一致 | 第二条验收「通过」；`ui report` 对 9 份记录各回放两次，HTML / 文本 / 叠加 PNG 的 sha256 与时间线指纹逐字节相等（`sample-clipped`、`sample-multi-row`、`sample-all-ops`、6 份损坏记录全部「一致」）；`tests/test_ui_replay.py::test_two_replays_render_byte_identical_artifacts`（9 例参数化）、`test_hash_seed_does_not_change_replay_output`（`PYTHONHASHSEED=0/1/12345` 三个子进程的四种哈希完全一致）、`test_view_only_shows_the_record_file_name_not_the_absolute_path`（换工作目录不影响字节） | LB-008 PR |
+| LB-008 界面对缺失/损坏字段给出可见提示而非崩溃 | 第三条验收「通过」；6 份 `fixtures/runs/corrupt/*.jsonl` 全部渲染成功（不抛异常），页面顶部出现 `<section class="banner" id="warnings">` 并列出 `LB-U0xx`：坏 JSON → `LB-U001`（整行丢弃，其余层照常）、缺字段 → `LB-U003`/`LB-U009`、无 `RunHeader` → `LB-U006`（+`LB-U004`）、未知 `kind`/乱序/重复 → `LB-U002`/`LB-U005`、坏帧引用 → `LB-U007`（叠加面板显示占位图）、事件不单调 → `LB-U008`；`tests/test_ui_record.py`（32 例，含「每个 `LB-U0xx` 码都有触发路径」）、`tests/test_ui_render.py::test_corrupt_records_render_visible_warnings_instead_of_crashing`（6 例参数化）、`tests/test_ui_fixtures.py::test_committed_screenshots_exist_and_are_not_blank` | LB-008 PR |
+| LB-008 回放与单步 | `ui view --step N` / `ui replay --record … --step N` 都可用：第 0 帧是「还没处理任何事件」，第 k 帧是「处理完前 k 条 `ExecEvent`」，世界状态由 `detail.state_delta` 依次折叠；越界夹紧到 `[0, 事件数]`；`sample-all-ops`（17 条事件）实测 0…17 共 18 帧可走，`sample-clipped` 走 `[0] → [1] log → [2] start s0 → [3] finish s0`；`tests/test_ui_replay.py::test_step_is_clamped_instead_of_raising`、`test_different_steps_produce_different_views`、`test_single_step_walks_the_event_stream`、`tests/test_ui_cli.py::test_ui_view_step_changes_the_rendered_page`、`test_ui_replay_single_step_prints_only_that_frame` | LB-008 PR |
+| LB-008 截图证据（真渲染，非 mock-up） | `scripts/screenshot_view.py` 用 `liveblocks.ui.render` 生成 HTML，再交给 **WebKitGTK**（无 `DISPLAY` 时自套 `xvfb-run`）渲染成 PNG；四张证据 `docs/evidence/lb-008-debug-view.png`（1440×1046，墨迹 34.0%，232 级）、`lb-008-debug-view-step0.png`（1440×1029，32.9%）、`lb-008-debug-view-all-ops.png`（1440×1520，37.5%）、`lb-008-corrupt-record.png`（1440×1236，40.9%，含 `LB-U0xx` 提示条）；`ui report` 用 `liveblocks.ui.evidence` 解 PNG 并判「非空白」（`tests/test_ui_fixtures.py::test_committed_screenshots_exist_and_are_not_blank`）；逐区域墨迹核对：主截图五个面板区域非背景像素分别 75.8% / 3.0% / 6.5% / 8.4% / 22.1%（`vision` / `layout` / `ast` / `ir` / `exec`），证明不是空白图也不是「只有外框」 | LB-008 PR |
+| LB-008 `RunHeader.timings_ms` 分层耗时 | 样例记录里 5 个键都是**记录时实测**的墙钟毫秒（`sample-clipped` 实测 vision 319.142 / layout 0.210 / parser 0.421 / ir 0.117 / exec 0.740 ms），界面只回显、不做性能结论；缺键的记录（`sample-all-ops`、`corrupt/missing-fields`）在面板上显示「记录未提供」并报 `LB-U009`；`tests/test_ui_render.py::test_missing_timings_are_shown_as_unknown` | LB-008 PR |
+| LB-008 视图确定性 golden（渲染产物 sha256） | `fixtures/runs/index.json` 记录每份记录的 `html_final` / `html_step0` / `text_final` / `overlay` 四个 sha256；`tests/test_ui_fixtures.py::test_rendered_artifacts_match_the_golden_hashes`（9 例参数化）、`test_report_detects_a_broken_golden`（改一个哈希后报告必须判失败，反证不是假通过） | LB-008 PR |
+| LB-008 样例记录是上游层的真实产物 | `scripts/build_run_records.py` 逐层真跑并计时后拼记录；`tests/test_ui_fixtures.py::test_chain_samples_match_a_fresh_pipeline_run`、`test_exec_only_sample_matches_a_fresh_simulation_run`、`test_record_layers_are_the_upstream_layer_outputs`（直接用 LB-003/004/005/006/007 的 API 重算并逐字段比对）、`test_builder_check_mode_accepts_the_committed_fixtures`、`test_builder_check_mode_catches_a_tampered_record`；手动执行 `python scripts/build_run_records.py --out fixtures/runs --check` → 「校验通过」 | LB-008 PR |
+| LB-008 界面层文档与实现一致 | `docs/UI.md`（草案 `ui_version` 0.0.1：一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表、命令、已知限制、9 条协议缺口）；`ui_document_gaps()` 对入库文档返回 0 项缺口（`ui report` 打印「文档缺口：0 项」）；`tests/test_ui_docs.py`（39 例，含 5 类**反向验证**：删面板行 / 删问题码行 / 删耗时行 / 删命令 / 改路径后必须报缺口） | LB-008 PR |
+| LB-008 测试与本地检查 | `bash scripts/check.sh`（Python 3.14.4 / pytest 9.2.0）→ `843 passed, 2 skipped in 96.68s`、`==> 检查通过`，退出码 0（基线 684 例 → 新增 159 例：`tests/test_ui_record.py` 32、`test_ui_replay.py` 32、`test_ui_render.py` 22、`test_ui_fixtures.py` 22、`test_ui_cli.py` 12、`test_ui_docs.py` 39）；跳过的 2 项与 LB-002/LB-003 相同（只有装 OpenCV 才跑的交叉核对） | LB-008 PR |
 
-**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，以及 **LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim）；仍未包含**界面与运行记录**（LB-008 / LB-009 起），也没有任何真实摄像头 / 实体卡片 / 硬件的证据（见 §3）。
+**说明**：以上「已验证」覆盖**文档层面**的可核对事实、**LB-001 骨架层面**的命令输出、**LB-002 合成卡片生成器**的可复现产物、**LB-003 识别模块**在 LB-002 fixtures 上的识别结果与统计，**LB-004 排列层**在 `fixtures/layouts` 候选夹具上的排列结论与验收对照，**LB-005 语法层**在 `fixtures/ast` 语法夹具上的解析结果与验收对照，**LB-006 规范化层**在 `fixtures/ir` 夹具上的确定性 / golden 快照 / schema 校验结论与验收对照，**LB-007 模拟执行层**在 `fixtures/exec` 夹具上的事件流 / `ExecResult` / 最终状态结论与验收对照（全部是**模拟后端**结果，事件一律 backend=sim），以及 **LB-008 调试视图**在 `fixtures/runs` 运行记录上的五层同屏 / 两次回放一致 / 坏记录可见提示 / 真实渲染截图四项结论；**仍未包含运行记录的「生产」**（LB-009 起：一条命令跑全链路并落盘 §8 记录），也没有任何真实摄像头 / 实体卡片 / 硬件的证据（见 §3）。
 
 ## 2. 计划中
 
-对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-007 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库里已有骨架、合成卡片生成器、识别模块、排列层、语法层、规范化层与**模拟**执行器，但还没有调试界面与运行记录）。
+对应 `docs/ROADMAP.md` 的条目。LB-001 … LB-008 已完成并迁至 §1「已验证」；其余条目尚未开始（仓库里已有骨架、合成卡片生成器、识别模块、排列层、语法层、规范化层、**模拟**执行器与调试视图，但**还没有运行记录的生产**：`fixtures/runs` 的记录目前由脚本把各层真跑一遍拼出来，全链路一条命令落盘仍属 LB-009）。
 
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
-| LB-008 | 调试界面（分层可视化） | 计划中 |
 | LB-009 | 端到端回归与运行记录 | 计划中 |
 | LB-021 | 交付与打包 | 计划中（依赖 LB-020） |
 
@@ -111,7 +121,17 @@
 
 ## 4. 已知限制与阻塞
 
-- **还没有调试界面与运行记录**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层、LB-006 规范化层与 LB-007 模拟执行器（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收、8 个 IR 夹具的 golden 快照验收与 8 个执行夹具的事件流/最终状态验收），但**没有调试界面（LB-008）与 JSONL 运行记录（LB-009）**，所以「能显示」「有完整运行记录」目前都不成立；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013）。
+- **还没有「运行记录的生产」，也没有接硬件**：仓库已有骨架、LB-002 合成卡片生成器、LB-003 识别模块、LB-004 排列层、LB-005 语法层、LB-006 规范化层、LB-007 模拟执行器与 **LB-008 调试视图**（含 6 个场景 fixtures 的识别统计、4 个候选夹具的排列验收、8 个语法夹具的解析验收、8 个 IR 夹具的 golden 快照验收、8 个执行夹具的事件流/最终状态验收，以及 `fixtures/runs` 9 份运行记录上的五层同屏 + 两次回放一致 + 坏记录可见提示 + 真渲染截图）。但**一条命令跑全链路并落盘 §8 运行记录仍属 LB-009**（`fixtures/runs` 的记录现在由 `scripts/build_run_records.py` 把各层真跑一遍拼出来）；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013）。
+- **LB-008 已知限制（详见 `docs/DECISIONS.md` D-019 与 `docs/UI.md`）**：
+  1. **视图只读、不重跑业务层**：记录里没有的层不会被补出来（缺层显示占位 + `LB-U004`），这是「看到的就是落盘的证据」的代价；
+  2. **单步 = 命令行 `--step N`**：没有交互式前端，HTML 里没有脚本（离线可开、便于截图），因此「点击单步」这类交互不属本阶段；
+  3. **世界状态是折叠出来的**：只按事件 `detail.state_delta` 叠加；`finish` 缺增量时面板标注「世界状态不完整」，不猜；
+  4. **叠加图标签只有 ASCII**：点阵字形集是 ASCII（`data/bitmap_font.json`），中文只出现在 HTML/文本形态；叠加 PNG 的压缩级别固定为 3（同一张 640×480 约 13 ms，字节仍可复现）；
+  5. **耗时是记录时的实测值**：`RunHeader.timings_ms` 只对同一份入库记录成立，重新生成记录会改变字节与该记录的 golden 哈希；
+  6. **截图不是像素级回归**：`ui report` 只量化「非空白 / 有层次 / 尺寸正常」（主截图墨迹 34.0%，232 级），不比对像素（那需要固定渲染引擎版本，本阶段不做）；截图证据由 `scripts/screenshot_view.py` 用 WebKitGTK + Xvfb 生成，环境缺引擎时脚本直接失败而**不伪造**；
+  7. **多步回放用的是局部记录**：P0 场景集里只有 `clipped` 能构成可执行程序（1 步 / 3 条事件），所以多步演示用 `sample-all-ops`（只有 IR + 事件流，界面如实标为缺层）。
+- **LB-008 未改动 ROADMAP**：`docs/ROADMAP.md` 的范围与优先级一个字节都没改（实现落在 `src/liveblocks/ui/`，LB-009 起的条目原样保留）。
+- **LB-008 发现的协议缺口（只报告，未改 `docs/PROTOCOL.md`）**：见 `docs/DECISIONS.md` D-019 与 `docs/UI.md` §8 —— §8 没有定义 `RunHeader` 必填字段、没有「输入帧引用」的字段名与解析规则、没有**分层耗时**槽位、没说一层缺了/一行坏了怎么表现，§9 没有界面（S7b）码区间、诊断对象没有记录行号与所属面板，§7.1 没说 `state_delta` 缺失时消费者怎么办，§8 没说同一 `kind` 重复出现与帧图像路径基准。
 - **LB-007 已知限制（详见 `docs/DECISIONS.md` D-018 与 `docs/EXEC.md`）**：
   1. **虚拟时钟不睡真实时间**：`duration_ms` / `at_ms` 是虚拟耗时（1 tick = 10 ms），**不是性能数据**；真实耗时只有报告里的 `SimRun.wall_ms`，不能拿「模拟很快」推出「真机很快」；
   2. **P0 的 IR 没有控制流**（D-016 第 1 条），所以验收里的「死循环样例」只能用两种**等价运行形态**表示——步骤数超过 `max_steps`、虚拟耗时超过 `timeout_ms`；本层没有、也不该有「真的循环执行」；

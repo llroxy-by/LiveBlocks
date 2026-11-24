@@ -4,8 +4,9 @@
 
 ## 现状
 
-- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**、**LB-005 语法解析**、**LB-006 规范化 IR** 与 **LB-007 模拟执行器**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片），再把 `Ast` 规范化成符合协议 §6 的 `Ir`（确定性输出、显式 `limits`、`op` 按 op 表校验，问题报 `LB-I0xx` 并通过入库 JSON Schema 校验），最后用**模拟执行器**把 `Ir` 跑成协议 §7 的 `ExecEvent[]` + `ExecResult`（虚拟时钟、来自 IR 的步数/超时限制、步骤边界中断，事件一律 `backend:"sim"`），并附一份可读的最终状态 JSON。
-- 仓库**还没有调试界面与运行记录**（LB-008 / LB-009 起），所以目前只能说「能在**模拟后端**上执行」，不能说「能显示」；**模拟通过 ≠ 硬件验证**，识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
+- 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**、**LB-005 语法解析**、**LB-006 规范化 IR**、**LB-007 模拟执行器** 与 **LB-008 调试视图**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片），再把 `Ast` 规范化成符合协议 §6 的 `Ir`（确定性输出、显式 `limits`、`op` 按 op 表校验，问题报 `LB-I0xx` 并通过入库 JSON Schema 校验），最后用**模拟执行器**把 `Ir` 跑成协议 §7 的 `ExecEvent[]` + `ExecResult`（虚拟时钟、来自 IR 的步数/超时限制、步骤边界中断，事件一律 `backend:"sim"`），并附一份可读的最终状态 JSON。
+- **LB-008 调试视图**可以把一份 §8 运行记录（JSONL）渲染成**一屏五层**：帧叠加（原帧 + 标记框 / 卡片中心 / 槽位）、排列、AST、IR、事件流 + 分层耗时，支持**回放**与**单步**；坏记录只给可见的 `LB-U0xx` 提示而不崩溃。它**只读**、只服务开发者，不做产品级 UI、不对外发布。
+- **运行记录的「生产」还没做**（LB-009 起）：目前 `fixtures/runs/` 里的记录由 `scripts/build_run_records.py` 把已有各层真跑一遍拼出来，还没有「一条命令跑全链路并落盘 §8 记录」的能力；**模拟通过 ≠ 硬件验证**，识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -212,6 +213,40 @@ liveblocks exec report --dir fixtures/exec
 取舍与 `PROTOCOL.md` §7/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-018 与
 [docs/PROGRESS.md](docs/PROGRESS.md) §4。
 
+## 调试视图（LB-008）
+
+把一份 **§8 运行记录（JSONL）** 渲染成**一屏五层**的调试视图：① 帧叠加（原帧上画标记框、
+卡片中心、排列槽位）② 排列（行/槽位表）③ AST（树）④ IR（`limits` + 逐步表，当前步高亮）
+⑤ 事件流（`seq`/`at_ms`/`phase`/`detail` + 世界状态 + 收尾结论）+ 分层耗时。界面**只读**：
+不改记录、不改业务数据，也不重新跑业务层。
+
+```bash
+# 文本形态（默认打印到标准输出）；--step 3 单步到第 3 条事件之后
+liveblocks ui view --record fixtures/runs/sample-clipped.jsonl --step 3
+
+# 自包含 HTML（无外链、无脚本；直接浏览器打开，也是截图证据的来源）
+liveblocks ui view --record fixtures/runs/sample-clipped.jsonl --html-out /tmp/lb-008-view.html
+
+# 帧叠加面板单独导出成 PNG（仓库自带编码器，字节可复现）
+liveblocks ui view --record fixtures/runs/sample-clipped.jsonl --overlay-out /tmp/lb-008-overlay.png
+
+# 回放：打印时间线，并核对「同一记录回放两次一致」
+liveblocks ui replay --record fixtures/runs/sample-clipped.jsonl
+
+# 对 fixtures/runs 跑一遍：逐夹具结论 + Issue #20 四条验收对照 + 截图证据核对
+liveblocks ui report --dir fixtures/runs
+```
+
+- 样例记录：`fixtures/runs/sample-clipped.jsonl`（真实全链路，1 步 / 3 条事件）、
+  `fixtures/runs/sample-multi-row.jsonl`（两行六卡，排列 + 语法诊断）、
+  `fixtures/runs/sample-all-ops.jsonl`（只有执行层的局部记录，8 步 / 17 条事件，用来演示多步回放）；
+  损坏记录在 `fixtures/runs/corrupt/`（坏 JSON、缺字段、无 `RunHeader`、未知 `kind`、坏帧引用、坏事件流）。
+- 截图证据（**真渲染**：`scripts/screenshot_view.py` 把视图 HTML 交给 WebKitGTK 渲染，不是 mock-up）：
+  `docs/evidence/lb-008-debug-view.png`、`docs/evidence/lb-008-debug-view-step0.png`、
+  `docs/evidence/lb-008-debug-view-all-ops.png`、`docs/evidence/lb-008-corrupt-record.png`。
+- 界面规范与 `LB-U0xx` 码表见 [docs/UI.md](docs/UI.md)（草案 `ui_version` 0.0.1），
+  取舍与 `PROTOCOL.md` §8/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-020。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -222,6 +257,7 @@ liveblocks exec report --dir fixtures/exec
 | [docs/GRAMMAR.md](docs/GRAMMAR.md) | P0 文法定义（产生式、卡面角色、AST 形状、`LB-P0xx` 码表），**草案** | 草案 v0.0.1（`grammar_version` 0.0.1） |
 | [docs/IR.md](docs/IR.md) | P0 规范化 IR 规范（op 表、`args`/`limits`/`step_id` 约定、`LB-I0xx` 码表、schema），**草案** | 草案 v0.0.1（`ir_version` 0.0.1） |
 | [docs/EXEC.md](docs/EXEC.md) | S6 模拟执行层规范（虚拟时钟、op 语义表、limits 判定顺序、中断、`LB-R0xx` 码表、`ExecState`），**草案** | 草案 v0.0.1（`exec_version` 0.0.1） |
+| [docs/UI.md](docs/UI.md) | S7b 调试视图规范（一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表），**草案** | 草案 v0.0.1（`ui_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |

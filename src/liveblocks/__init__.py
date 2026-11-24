@@ -16,9 +16,13 @@
   显式 ``limits``、op 表校验与入库 JSON Schema，问题报 ``LB-I0xx``，**不执行**；
 - LB-007：模拟执行层（:mod:`liveblocks.runtime`），``Ir`` → ``ExecEvent[]`` + ``ExecResult``
   + 最终状态（协议 §7），虚拟时钟、来自 IR 的 ``limits``、步骤边界中断，问题报 ``LB-R0xx``；
-  **只有 ``backend: "sim"``**，不接硬件、不做界面。
+  **只有 ``backend: "sim"``**，不接硬件、不做界面；
+- LB-008：调试视图（:mod:`liveblocks.ui`），把一份 §8 运行记录（JSONL）渲染成**一屏五层**
+  （帧叠加 / 排列 / AST / IR / 事件流 + 分层耗时），支持回放与单步；坏记录只报 ``LB-U0xx``
+  可见提示而不崩溃。**只读**、只服务开发者，不做产品级 UI、不对外发布。
 
-界面与运行记录按 ``docs/ROADMAP.md`` 的 LB-008 / LB-009 起加入，并各自带测试。
+运行记录的**生产**（``RunHeader`` 打包与全链路落盘）仍属 ``docs/ROADMAP.md`` 的 LB-009，
+``fixtures/runs/`` 里的记录目前由 ``scripts/build_run_records.py`` 把已有各层真跑一遍拼出来。
 """
 
 from __future__ import annotations

@@ -195,7 +195,61 @@ fixtures/exec/
   liveblocks exec report --dir fixtures/exec
   ```
 
-## 8. 约定
+## 8. `runs/`（LB-008 运行记录夹具）
+
+调试视图（LB-008）消费 `docs/PROTOCOL.md` §8 的**运行记录**（JSONL：首行 `RunHeader`，随后按产出
+顺序写各层对象与事件）。运行记录的**生产**属于 LB-009，本单只负责「消费」；为了让视图有真输入，
+这里把已有各层**真跑一遍**拼成记录：
+
+```
+fixtures/runs/
+├── index.json                 # 清单：每份记录的期望层/事件数/问题码 + 渲染产物 sha256
+├── sample-clipped.jsonl       # 真实全链路：clipped 场景（1 步 / 3 条事件）
+├── sample-multi-row.jsonl     # 真实全链路：multi-row 场景（两行六卡，0 步 + 语法诊断）
+├── sample-all-ops.jsonl       # 只有执行层：all-ops golden Ir 真跑（8 步 / 17 条事件）
+└── corrupt/*.jsonl            # 6 份故意写坏的记录（见下表）
+```
+
+| 记录 | 族 | 层 | 事件 | 来源 |
+| --- | --- | --- | --- | --- |
+| `sample-clipped` | sample | 五层齐全 | 3 | **真跑出来的**：识别 → 排列 → 语法 → IR → 模拟执行 |
+| `sample-multi-row` | sample | 五层齐全 | 1 | 同上；排列有两行，语法层报 `LB-P002` / `LB-P004`，IR 因此 0 步 |
+| `sample-all-ops` | partial | 只有 IR + 执行 | 17 | **真跑出来的**：`../ir/golden/all-ops.json` 交给模拟执行器（用来演示多步回放与缺层提示） |
+| `corrupt/bad-json` | corrupt | — | 1 | 第 4 行是截断的 JSON → `LB-U001`，整行丢弃、其余照常 |
+| `corrupt/missing-fields` | corrupt | — | 0 | header 缺 `run_id`/`backend`/`timings_ms`、卡片缺 `center_px`、事件缺 `seq`/`phase` → `LB-U003` / `LB-U009` |
+| `corrupt/no-header` | corrupt | — | 0 | 首行是 `Layout`，没有 `RunHeader` → `LB-U006`（缺层另有 `LB-U004`） |
+| `corrupt/unknown-kind` | corrupt | — | 1 | 出现 §8 没有的 `kind`、`Ast` 早于 `Layout`、`Layout` 重复 → `LB-U002` / `LB-U005` |
+| `corrupt/bad-frame` | corrupt | — | 1 | `frame.image_ref` 指向不存在的文件 → `LB-U007`，叠加面板显示占位图 |
+| `corrupt/bad-events` | corrupt | — | 3 | `seq` 不递增、`at_ms` 回退、`phase` 缺失 → `LB-U008` / `LB-U003` |
+
+- 三份样记录都是**上游快照**：`tests/test_ui_fixtures.py` 会用当前各层代码重跑并逐字段比对
+  （`timings_ms` 除外——它是**记录时实测**的墙钟耗时，不同机器/不同次运行必然不同）。
+  损坏夹具也用脚本生成，测试会比对「文件内容 == 脚本输出」，防止有人手改成「看起来能过」的假夹具。
+- `index.json` 的 `expect.hashes` 是渲染产物（HTML 末帧 / HTML 第 0 帧 / 文本 / 叠加 PNG）的
+  sha256，属于 **golden**：改了视图模板、文案或叠加画法就必须重新生成（见下条命令）并在 PR 里说明 diff。
+- 重新生成（会把三份记录**真跑一遍**、重写损坏夹具与清单哈希）：
+
+  ```bash
+  python scripts/build_run_records.py --out fixtures/runs
+  ```
+
+- 只校验、不写盘（用当前代码重跑链路逐字段比对）：
+
+  ```bash
+  python scripts/build_run_records.py --out fixtures/runs --check
+  ```
+
+- 跑一遍视图自检（逐夹具结论 + Issue #20 四条验收对照 + 截图证据核对，退出码 0 = 全过）：
+
+  ```bash
+  liveblocks ui report --dir fixtures/runs
+  ```
+
+- 截图证据不在 `fixtures/` 而在 `docs/evidence/`（它们是「视图渲染产物」的证据，不是测试夹具）：
+  `docs/evidence/lb-008-debug-view.png` 等四张，由 `scripts/screenshot_view.py` 用 WebKitGTK + Xvfb
+  把 `liveblocks ui view --html-out` 的 HTML 真渲染得到，**不是 mock-up**。
+
+## 9. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。
