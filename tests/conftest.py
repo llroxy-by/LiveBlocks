@@ -218,3 +218,21 @@ def calib_small_outcome(calib_small_preset):
 @pytest.fixture(scope="session")
 def calib_dir() -> Path:
     return CALIB_DIR
+
+
+# --- LB-034 固件骨架的公共夹具 --------------------------------------------------------
+
+#: 主机侧编译出的固件工具（整个会话只编一次：固件源码是同一份，编一次就够）。
+@pytest.fixture(scope="session")
+def firmware_host_tool(tmp_path_factory: pytest.TempPathFactory):
+    """用主机 gcc 编译 `firmware/main/` 里的可移植源码（不烧写、不需要 ESP-IDF）。
+
+    编译失败一律 **fail 而不是 skip**：主机 gcc 是普通环境就该有的东西，
+    编不过说明固件源码有缺陷（验收里的「源码能编译」）。
+    """
+    from liveblocks.firmware.hosttool import HostToolError, build_host_tool
+
+    try:
+        return build_host_tool(tmp_path_factory.mktemp("firmware-host"))
+    except HostToolError as error:  # pragma: no cover - 只在固件源码坏了时触发
+        pytest.fail(f"固件源码在主机上编译不过（实现缺陷，不是环境问题）：{error}")

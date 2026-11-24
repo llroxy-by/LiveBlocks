@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/llroxy-by/LiveBlocks/config/board.schema.json",
+  "title": "序界（LiveBlocks）板级配置（草案 0.0.1）",
+  "description": "LB-034 固件骨架的**唯一引脚来源**。代码里不许出现裸 GPIO 数字；本文件的默认值一律标「待实测」。零依赖校验器见 src/liveblocks/firmware/board.py（结论必须与官方 jsonschema 一致，tests/test_firmware_board.py 交叉核对）。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "board_id",
+    "board_name",
+    "mcu",
+    "config_status",
+    "pins",
+    "serial",
+    "firmware"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "板级配置格式版本（改动字段必须提升并记 docs/DECISIONS.md）"
+    },
+    "board_id": {
+      "type": "string",
+      "enum": ["esp32c3-supermini"],
+      "description": "板子标识，必须与 docs/HW.md 里设备自报的 board 一致（LB-034 只支持这一块）"
+    },
+    "board_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mcu": {
+      "type": "string",
+      "enum": ["esp32c3"],
+      "description": "MCU 型号；LB-034 只做 ESP32-C3"
+    },
+    "config_status": {
+      "type": "string",
+      "minLength": 1,
+      "description": "本文件的验证状态（必须含「待实测」，除非全部项都已核对）"
+    },
+    "pins": {
+      "type": "object",
+      "description": "命名引脚表：键是角色名（代码按角色名取），值是引脚条目",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "gpio", "active_low", "verified", "note"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gpio": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 48,
+            "description": "GPIO 编号。只有本文件与生成的头文件里允许出现这个数字"
+          },
+          "active_low": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "是否已在实物上核对过。false 时 note 必须含「待实测」"
+          },
+          "verified_by": {
+            "type": "string",
+            "description": "verified=true 时必填：核对记录（Issue 链接 / 测量方式 / 日期）"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "serial": {
+      "type": "object",
+      "required": ["uart", "tx_gpio", "rx_gpio", "baud", "verified", "note"],
+      "properties": {
+        "uart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "tx_gpio": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 48
+        },
+        "rx_gpio": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 48
+        },
+        "baud": {
+          "type": "integer",
+          "minimum": 9600,
+          "maximum": 921600
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "verified_by": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "firmware": {
+      "type": "object",
+      "required": ["heartbeat_ms", "heartbeat_ms_verified", "heartbeat_note", "led_count", "led_driver"],
+      "properties": {
+        "heartbeat_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000,
+          "description": "HEARTBEAT 上行周期（毫秒）；具体值待人工实测后回填"
+        },
+        "heartbeat_ms_verified": {
+          "type": "boolean"
+        },
+        "heartbeat_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "led_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "led_driver": {
+          "type": "string",
+          "enum": ["placeholder"],
+          "description": "LB-034 只做占位驱动；真实灯效驱动不在本单范围"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

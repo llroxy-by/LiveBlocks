@@ -5,10 +5,10 @@
 > - **计划中**：已明确范围与验收，尚未产出或尚未验证。
 > - **待硬件验证**：结论依赖实物/环境，代理不得自行迁移到「已验证」。
 >
-> 最近更新：2026-11-24（LB-033 硬件后端协议层与虚拟串口模拟设备（LB-013 协议侧）：串口帧格式（帧头 `4C 42` + 长度 + CRC-16/CCITT-FALSE + 序号 1..0xFFFF + 命令/事件类型）、`Transport` 抽象（`PtyTransport` / `SerialTransport` / `MemoryTransport`）、`LB-H0xx` 断连·超时·重连·坏帧·乱序·设备故障错误模型，以及一台用 pty 假装 ESP32-C3 SuperMini 的纯 Python **设备模拟器**；`backend:"hw"` 与 sim 同一份 §7.1 形状，8 种 IR 双后端逐事件一致（`tests/test_backend_parity.py`），拔线出明确断连错误事件且毫秒级结束、插回可重连继续跑。**全部证据来自 pty 上的模拟器，属模拟器证据，不是硬件证据**；真实串口与真机 = **待人工验证**（`docs/HW.md` §8））
-> 上一轮：LB-032 实体卡片规范草案与标记页模板生成器：`docs/CARD-SPEC.md` 给出卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的**草案**（每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」）；`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`cardsheet verify` 把页面渲染成图再识别，**16/16 张卡的 id 与朝向全部读出**、转 90°/180°/270° 后朝向跟着转、同参数两次渲染逐字节一致；`cardsheet stencil` 是没打印机时的手绘降级版。实体卡打印 / 基材 / 打印工艺 / 可识别距离 = **待人工验证**）
-> 上上上轮：LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
-> 上上上上轮：LB-009 端到端回归与运行记录（`liveblocks e2e run` / `e2e regression`）
+> 最近更新：2026-11-24（LB-034 ESP32-C3 SuperMini 固件骨架：`firmware/` 下的 ESP-IDF 工程给出上电启动日志、串口心跳（事件 `0x87`）、命令分发占位（回 `LB-H006`）与灯效驱动占位；引脚、串口参数与心跳周期全部来自 `config/board.esp32c3-supermini.json`（默认值一律标「待实测」），C 源码里零硬编码 GPIO（`LB-F005` 扫描守住）；**ESP-IDF v5.3.2 从零编译通过**（`bash scripts/build_firmware.sh --clean`，950 个构建目标、0 条编译告警，产物 `lb_firmware.bin` 215264 字节 / sha256 `1ceba447…`）；心跳帧与 LB-033 的 pty 模拟器**逐字节一致**（`tests/test_firmware_parity.py`，属模拟器证据）。**烧写、串口日志、复位自恢复 = 待人工验证**（`docs/FIRMWARE.md` §7）；固件编译未接 CI（本单排除 CI 配置变更））
+> 一轮前：LB-033 硬件后端协议层与虚拟串口模拟设备（LB-013 协议侧）：串口帧格式（帧头 `4C 42` + 长度 + CRC-16/CCITT-FALSE + 序号 1..0xFFFF + 命令/事件类型）、`Transport` 抽象（`PtyTransport` / `SerialTransport` / `MemoryTransport`）、`LB-H0xx` 断连·超时·重连·坏帧·乱序·设备故障错误模型，以及一台用 pty 假装 ESP32-C3 SuperMini 的纯 Python **设备模拟器**；`backend:"hw"` 与 sim 同一份 §7.1 形状，8 种 IR 双后端逐事件一致（`tests/test_backend_parity.py`），拔线出明确断连错误事件且毫秒级结束、插回可重连继续跑。**全部证据来自 pty 上的模拟器，属模拟器证据，不是硬件证据**；真实串口与真机 = **待人工验证**（`docs/HW.md` §8））
+> 两轮前：LB-032 实体卡片规范草案与标记页模板生成器：`docs/CARD-SPEC.md` 给出卡面尺寸、标记尺寸、静区、基材、打印工艺、批次编号与质检项的**草案**（每个数字都能追到卡片字典 / ArUco 位表 / 卡面版式 / 静区规则，追不到的显式标「待实测」）；`liveblocks cardsheet render` 生成 A4 标记页（卡面 + 静区 + 裁切线 + 卡片编号 + 朝向标记，PNG 或 PDF），`cardsheet verify` 把页面渲染成图再识别，**16/16 张卡的 id 与朝向全部读出**、转 90°/180°/270° 后朝向跟着转、同参数两次渲染逐字节一致；`cardsheet stencil` 是没打印机时的手绘降级版。实体卡打印 / 基材 / 打印工艺 / 可识别距离 = **待人工验证**）
+> 三轮前：LB-030 Web 摄像头采集与人工辅助测试台：`liveblocks serve-cam serve` 一条命令起本地服务，页面用 `getUserMedia` 选任意摄像头、单帧/连续取帧，`/api/frame` 返回 §3 候选与叠加图，`/api/capture` 落成可被 `recognize report` 直接消费的 `fixtures/live/<时间戳>/`，「识别错了」的样本单独进 `fixtures/live/refused/`。离线验收①②③有真跑证据；④ 手机后置摄像头 + 实体卡 = **待人工验证**，PR 见本仓库 `agent/lb-capture-bench-*` 分支）
 
 ## 1. 已验证
 
@@ -148,6 +148,15 @@
 | LB-033 golden 夹具（`fixtures/hw/`）逐字节可复现 | `tests/test_hw_fixtures.py` 13 例：5 个夹具（`all-ops` 17 事件 / `from-valid-basic` 5 / `drop-empty` 7（`LB-R005`）/ `timeout-exact` 3 / `non-terminating-steps` 22（`LB-R002`））真跑一遍，事件流 JSONL、`ExecResult`、`ExecState` 与入库 golden **逐字节一致**；`index.json` 的 `status` / `steps` / `events_count` / `codes` / `frames` 与实测一致；`fixtures/README.md` §13 说明生成命令与「模拟器证据」口径 | LB-033 PR |
 | LB-033 文档与实现的正反向核对（含「模拟器证据 ≠ 硬件证据」与待人工验证步骤） | `docs/HW.md`（草案 0.0.1）；`tests/test_hw_docs.py` 24 例：`hw_document_gaps` 对入库文档返回空；**反向验证**删掉一条命令行 / 一个事件行 / 一个 `LB-H0xx` 行、改错误码标题、改 MAGIC、改载荷上限、删「模拟器证据」/「待人工验证」/传输类名/`"hw"`/CRC 多项式之一，都必须报缺口；文档禁用「真机验证通过」这类说法；§8「待人工验证」必须含 HW-1..HW-4 与「怎么验 / 通过标准」；文档里的 `--ir` 路径与 `fixtures/hw/*` 路径必须真实存在 | LB-033 PR |
 | LB-033 全量检查（本地，等价 CI 环境：只装 `.[dev]`） | `PYTHON=/tmp/lb-hw-venv/bin/python bash scripts/check.sh`（rebase 到 main `6f2f61c`、含 LB-032 的测试）→ `compileall` 通过、**1488 passed, 3 skipped in 250.31s**、`==> 检查通过`，退出码 0（Python 3.14.4）；其中本单新增 7 个测试文件：`tests/test_hw_frames.py` 29、`tests/test_hw_transport.py` 14、`tests/test_hw_device.py` 10、`tests/test_hw_exec.py` 16、`tests/test_hw_cli.py` 11、`tests/test_hw_fixtures.py` 13、`tests/test_hw_docs.py` 24、`tests/test_backend_parity.py` 21（共 138 例）；3 个 skip 是需要 OpenCV / jsonschema 的可选交叉核对，与本单无关 | LB-033 PR |
+| LB-034 板级配置是引脚的唯一来源，schema 校验通过、默认值一律标「待实测」 | `config/board.esp32c3-supermini.json` + `config/board.schema.json`（草案 0.0.1）；`python -m liveblocks firmware check` → `合格：ESP32-C3 SuperMini（esp32c3-supermini / esp32c3）：led_strip_data=GPIO3（待实测）、status_led=GPIO8（待实测）、user_button=GPIO9（待实测）；串口 UART0 tx=GPIO21 rx=GPIO20 @115200；心跳 1000 ms；待实测项 5 个`，退出码 0；零依赖校验器 `src/liveblocks/firmware/board.py`（`LB-F001` 缺字段 / `LB-F002` 取值 / `LB-F003` 未标待实测或声称已验证无记录 / `LB-F004` 引脚冲突越界），装得上官方 `jsonschema` 时用它做**独立实现**交叉核对；`tests/test_firmware_board.py`（39 例）含 12 组反向验证（改坏一处必须报对应码），并验证「`verified=true` 但没给 `verified_by` 必须报」 | LB-034 PR（Python 3.14.4） |
+| LB-034 固件源码里搜不到裸 GPIO 数字 | `python -m liveblocks firmware scan` → `合格：19 个固件源文件（.c/.h）里没有裸 GPIO 数字`，退出码 0；扫描范围 `firmware/main` + `firmware/tools`（生成目录与 ESP-IDF 构建目录不算），规则见 `docs/FIRMWARE.md` §2；反向验证：注入 `gpio_set_level(8, 1)` / `GPIO8` / `GPIO_NUM_9` / `cfg.gpio = 21` 必须报 `LB-F005`，而 `tx=GPIO%d`、`LB-034`、`%02X` 这类行**不许**报（误报会让人学会忽略告警） | LB-034 PR |
+| LB-034 心跳帧与 LB-033 的模拟器**逐字节一致**（模拟器证据） | `tests/test_firmware_parity.py`（5 例）：让 pty 上的 `DeviceSimulator(heartbeat_ms=20)` 真发 ≥4 帧 `HEARTBEAT`，把每帧的 `seq` / `uptime_ms` / `steps` 喂给**主机 gcc 编出来的固件编码器**（`firmware/main/lb_{frame,json,heartbeat}.c`），断言整帧字节相同（帧头 + LEN + 载荷 + CRC）；载荷单独再比一次（键序 `{"steps":…,"uptime_ms":…}`）、线上毫秒文本必须等于 `round(x,3)` 的 `repr`；反向验证：改 `seq` / `uptime_ms` / `steps` 任一项都必须不等。**这是模拟器证据，不是硬件证据** | LB-034 PR |
+| LB-034 源码从零编译通过（编译证据，非模拟器） | `bash scripts/build_firmware.sh --clean`（ESP-IDF v5.3.2，riscv32-esp-elf-gcc esp-13.2.0_20240530，目标 esp32c3）→ `Project build complete`，950 个构建目标从零编、编译器告警 **0** 条；产物 `firmware/build/lb_firmware.bin`（**215264 字节**，sha256 `1ceba447ebeb059df37755a6908612c59a5b52c32d1ce536dc727b46e55928b9`）；`tests/test_firmware_build.py::test_real_idf_build_produces_a_firmware_binary` 在有工具链的机器上会再跑一次同一脚本（CTest 里 22.6 s，退出码 0、产物 > 100 KB）；没有工具链时该用例 **skip 并说明原因**，不伪造编译输出。★ 该 sha256 只对应那一次构建（ESP-IDF 把构建时间写进 app 描述符，重编哈希会变、大小不变） | LB-034 PR |
+| LB-034 启动日志 / 命令分发占位 / 灯效占位的行为（同一份源码在主机上真跑） | `firmware/tools/lb_host_tool.c` + `tests/test_firmware_frames.py`（29 例）：`boot-log` 打出板子、配置来源 `config/board.esp32c3-supermini.json`、三个引脚（含「待实测」）、串口参数、心跳周期、命令表与「灯效驱动占位…未驱动任何灯」；5 条命令各回一帧 `FAULT`（逐字节等于 Python 侧 `event_frame("FAULT", …)` 的编码）、未知命令号回 `LB-H006`、非命令帧只记日志、CRC 错只丢坏帧、日志文本混进串口也能重同步（含日志里带 `LB-H006` 时不吞真帧） | LB-034 PR |
+| LB-034 构建脚本**只编译、不烧写**，并拒绝烧写参数 | `scripts/build_firmware.sh` 的每条 `idf.py` 调用只有 `set-target` 与 `build`；`bash scripts/build_firmware.sh flash` → 退出码 **2**、stderr `拒绝：本脚本只编译、不烧写。烧写步骤见 docs/FIRMWARE.md §5。`；`--build-dir /` → 退出码 2（`不安全`）；`tests/test_firmware_build.py`（12 例）把这两条拒绝路径与「生成头文件与 `src/liveblocks/hw/` / 板级配置逐值一致」「生成物被 git 忽略」「组件编译的源码与主机侧是同一批」都做成用例 | LB-034 PR |
+| LB-034 文档与实现的正反向核对 | `docs/FIRMWARE.md`（草案 0.0.1，9 章）；`tests/test_firmware_docs.py`（38 例）：`firmware_document_gaps` 对入库文档返回空；**反向验证**删章节 / 删 `LB-F0xx` 码或标题 / 删命令 / 去掉「只编译」/「不烧写」/「待实测」/「模拟器证据」/ 把 §7 的「待人工验证」改名 / 去掉 `idf.py` 烧写命令 / 加一句「真机验证通过」——每一种都必须报缺口；文档里那串例帧十六进制必须等于固件编码器的真实输出（改一个字节就挂） | LB-034 PR |
+
+| LB-034 全量检查（本地，等价 CI 环境：只装 `.[dev]`） | `PATH=$HOME/esp/bin:$PATH PYTHONPATH=src bash scripts/check.sh`（PATH 里带了 cmake / ninja，因为本单有个「真编译一次」的用例）→ `compileall` 通过、**1612 passed, 2 skipped in 268.81s**、`==> 检查通过`，退出码 0（Python 3.14.4）；2 个 skip 是需要 OpenCV 的可选交叉核对，与本单无关；其中本单新增 5 个测试文件共 **123 例**：`tests/test_firmware_board.py` 39、`tests/test_firmware_docs.py` 38、`tests/test_firmware_frames.py` 29、`tests/test_firmware_build.py` 12、`tests/test_firmware_parity.py` 5。另在装得上官方 `jsonschema` 的 venv 里单独跑 `pytest tests/test_firmware_board.py -k "jsonschema or schema"` → **3 passed**（jsonschema 4.26.0，零依赖校验器与独立实现口径一致） | LB-034 PR |
 
 ## 2. 计划中
 
@@ -156,6 +165,7 @@
 | 条目 | 内容 | 状态 |
 | --- | --- | --- |
 | LB-033（硬件侧） | 真实串口 / 真机接入与 ESP32-C3 上的联调（协议侧已完成，见 §1；硬件侧属 LB-020） | 计划中（待硬件到位与人工实测） |
+| LB-034（硬件侧） | 固件骨架已能编译（见 §1），但**烧写、串口日志、复位自恢复、引脚核对与心跳周期抖动**都要人上板实测（`docs/FIRMWARE.md` §7 的 F-1…F-5）；`STEP` 业务与真实灯效驱动属后续固件任务 | 计划中（待硬件到位与人工实测） |
 | LB-021 | 交付与打包 | 计划中（依赖 LB-020） |
 
 尚未决的 Q1–Q10 见 `docs/ARCHITECTURE.md` §4 与 `docs/DECISIONS.md` 末表；它们只影响「怎么做」，不改变上述计划项的存在。
@@ -177,11 +187,18 @@
 | **LB-031 真实摄像头标定（待人工验证）** | 在**真实摄像头**上用打印的标定板采 15 张以上板图后跑 `liveblocks calibrate run`，得到该设备的真实重投影误差与内参。代理没有摄像头与实物板，**不得代填**；人工步骤与记录要求见 `docs/CALIB.md` §8，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交。同一节的「可用拍摄距离」与「板面平整度/打印尺寸误差」也都在此列表内 | `docs/CALIB.md` §8、`docs/ROADMAP.md` LB-031 |
 | **LB-032 实体卡片打印（待人工验证）** | 打印 A4 标记页后：① 卡面长边/短边与标称 60×40 mm 的实测偏差（100% 比例是否准）；② 标记 6×6 模块的边缘质量与 6 个模块总长（标称 24 mm）；③ 卡面声明静区 2.5 mm（< 静区规则 4 mm）在贴卡/贴深色物件时是否仍能读出 `marker_id`；④ 基材与打印工艺对翘曲、透印、反光的影响；⑤ 0.3 / 0.5 / 0.8 m 与 0°/15°/30° 下的检出率；⑥ 手剪沿裁切线的偏差。代理没有打印机、卡纸与相机，**不得代填**；人工步骤见 `docs/CARD-SPEC.md` §11（与 `sheet.spec.HUMAN_VERIFICATION` 逐条对应），结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/CARD-SPEC.md` §11、`docs/ROADMAP.md` LB-032 |
 | **LB-033 真实串口与真机（待人工验证）** | `SerialTransport` 打开真实串口（8N1 / 115200）并按协议收发；真机拔 USB 断连出 `LB-H001` 且不阻塞、插回可重连；真机复位后世界状态是否保留；长线 / 干扰下的坏帧（`LB-H004`）与心跳周期。代理只有 pty 上的模拟器，**不得代填**；人工步骤与通过标准见 `docs/HW.md` §8 的 HW-1…HW-5 表，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/HW.md` §8、`docs/ROADMAP.md` LB-033 |
+| **LB-034 固件烧写与串口实测（待人工验证）** | ① 烧写 `lb_firmware.bin` 能否成功（`idf.py -p <口> flash`）；② 串口日志是否如 `docs/FIRMWARE.md` §5 那样完整、心跳是否按 `heartbeat_ms` 周期上行；③ 按 EN 复位后能否自恢复（重新打日志、序号从 1 重来）；④ 配置里的三个引脚与 UART 焊盘是否与实物一致；⑤ 心跳周期间隔均值与抖动（对应 `docs/HW.md` §8 HW-5）。代理没有板子，**不得代填**；步骤与通过标准见 `docs/FIRMWARE.md` §7 的 F-1…F-5，结论请按 `.github/ISSUE_TEMPLATE/hardware-test.md` 提交 | `docs/FIRMWARE.md` §7、`docs/ROADMAP.md` LB-034 |
 | HW-8 真实闭环 | LB-010 / LB-011 / LB-012 / LB-013 / LB-020 的端到端联调与延迟 | `docs/ROADMAP.md` §3 |
 
 ## 4. 已知限制与阻塞
 
 - **软件闭环（P0）已经跑通并被回归守住，但还没有接硬件**：一条命令 `liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并落盘 §8 运行记录，`liveblocks e2e regression` 用记录形状 + 指纹式黄金基准 + 破坏注入自检 + 固定时间上界把它守住；`Ir` 到现在只被**模拟后端**跑过，**没有任何硬件后端**（LB-013），也没有任何真实摄像头 / 实体卡片的证据。
+- **LB-034 已知限制（详见 `docs/DECISIONS.md` D-025 与 `docs/FIRMWARE.md` §8）**：
+  1. **骨架不是能跑业务的固件**：没有 `STEP` 语义（`steps` 恒 0）、没有真实灯效驱动、没有重连与状态持久化；
+  2. **日志与协议帧共用 UART0**：靠 `LB` MAGIC 逐字节重同步，日志片段会计入坏帧/丢字节统计；日志前缀改成 `[fw]`（`[LB]` 会制造假帧头），C 侧对帧头字段不认识的情形逐字节重同步（比 Python 侧保守，差异记在 `docs/FIRMWARE.md` §8）；
+  3. **编译证据是本机真跑，不是 CI**：本单授权范围排除 CI 配置变更，`.github/workflows/ci.yml` 一个字节没改；接不接 CI 需人点头；
+  4. **构建产物不可字节复现**：ESP-IDF 把构建时间写进 app 描述符，同一份源码重编哈希会变（大小不变），所以 sha256 只作那次构建的凭据；
+  5. **只支持一块板子**：`board_id` / `mcu` 被校验器钉死为 `esp32c3-supermini` / `esp32c3`；引脚默认值全是「待实测」。
 - **LB-009 已知限制（详见 `docs/DECISIONS.md` D-020 与 `docs/E2E.md`）**：
   1. **记录不入库**：`runs/e2e` 在 `.gitignore` 里——`RunHeader.timings_ms` 是记录时实测的墙钟耗时，每跑一次都不一样；入库的是**黄金基准**（每层文档的指纹、`kind` 序列、行数、计数）与记录形状的约定；
   2. **只跑合成图**：`backend` 恒为 `sim`，生成层是 LB-002 的合成卡片图（6 个入库场景），不接真实摄像头、不做标定；模拟通过 ≠ 硬件验证；

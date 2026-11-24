@@ -807,6 +807,64 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
   ③ 真实串口参数（波特率可用范围、流控）与真机断连/复位行为待人工验证（`docs/HW.md` §8）；
   ④ 心跳周期待 LB-034 定值；⑤ `STEP` 幂等只记最后一条，长重连序列需要窗口化（`docs/HW.md` §9）。
 
+## D-025 LB-034 ESP32-C3 SuperMini 固件骨架：引脚只许来自板级配置、协议常量也要生成、逐字节比心跳（已定）
+
+- **背景**：LB-034 要一个能编译、能上电、能发心跳的最小固件骨架，而且有两条硬约束：
+  ① **代码里零硬编码 GPIO**（`docs/HARDWARE.md` §3 明说「引脚表尚未绘制，任何实现不得硬编码引脚号」）；
+  ② **心跳帧与 LB-033 的模拟器逐字节一致**。真板子还没上手（LB-020），所以本单只做骨架，
+  并且把「编译证据」「模拟器证据」「待人工验证」三件事分开记。
+
+- **决策**：
+  1. **引脚只有一个来源：`config/board.esp32c3-supermini.json`**。C 代码不直接写数字，
+     构建时由 `python -m liveblocks firmware headers` 生成 `lb_board_config.h`，代码只认
+     `LB_BOARD_*` / `LB_PIN_ROLE_*` 宏。生成物**不入库**（`.gitignore` 挡住）——入库就会有人手改，
+     手改就又多了一个来源。缺生成头文件时 `idf.py build` 会直接报 `FATAL_ERROR` 并提示用构建脚本。
+  2. **协议常量也生成，C 侧不抄第二份**。`lb_protocol.h` 由 `src/liveblocks/hw/{frames,protocol}.py`
+     生成（MAGIC / 线格式版本 / 命令与事件号 / `LB-H0xx` / 命令表）。C 与 Python 各写一份常量，
+     「逐字节一致」迟早变成巧合。
+  3. **「零硬编码 GPIO」用扫描 + 反向测试守住**，不靠自觉：`bare_gpio_violations` 查
+     `GPIO<数字>` / `GPIO_NUM_<数字>`，以及「说引脚的行里不许出现 0/1 之外的数字字面量」；
+     测试既注入硬编码（必须报 `LB-F005`），也塞 `tx=GPIO%d`、`LB-034`、`%02X` 这类行（必须不报）——
+     误报会让人学会忽略告警。
+  4. **心跳的 `uptime_ms` 按 Python `round(x, 3)` + `repr()` 的形状输出**（`12.5`、`60000.0`、
+     `0.001`），载荷键排序后是 `{"steps":…,"uptime_ms":…}`。逐字节一致不是「字段对得上」，
+     这四个字只有在键序、分隔符、数字文本三件事都钉死时才成立；边界（`1e16` 以上、`1e-4` 以下）
+     写进 `docs/FIRMWARE.md` §8，不假装没有。
+  5. **逐字节比对用「主机 gcc 编译同一份源码」+「pty 模拟器真发帧」来证**：可移植源码
+     （帧编解码 / JSON / 心跳 / 分发 / 启动日志 / 灯效占位）只用 C11 标准库，`main.c` 与
+     `lb_uart.c` 才依赖 ESP-IDF；`firmware/tools/lb_host_tool.c` 把它们打进一个主机命令行工具。
+     于是比对是「模拟器产的整帧字节」vs「固件编码器产的整帧字节」，而不是两段 Python 互相比。
+  6. **占位也回 `FAULT`（`LB-H006`），不静默丢弃**：主机侧对「设备回了什么」有判据，
+     静默丢弃与丢帧无法区分。回 `LB-H006` 让人一眼看出「帧到了、CRC 对、命令号认识，业务没实现」。
+  7. **C 侧的重同步比 Python 侧更保守**：帧头字段（VER / KIND / TYPE）不认识时只丢 1 字节，
+     不按帧头里的 LEN 丢整帧候选。原因很具体：日志与协议帧共用 UART0，日志里出现 `LB-H006`
+     这种字样时，假 MAGIC 后面的 LEN 完全不可信，按它丢会把后面真正的帧一起吃掉（写测试时真踩到）。
+     同时把日志前缀从 `[LB]` 改成 `[fw]`，减少制造假帧头。差异记在 `docs/FIRMWARE.md` §8。
+  8. **构建脚本只编译、绝不烧写**，并且**拒绝** `flash` / `monitor` 这类参数（退出码 2）；
+     脚本本身没有 esptool 调用。烧写步骤写在 `docs/FIRMWARE.md` §5，标明是人做的。
+  9. **CI 不接**：本单的授权范围排除 CI 配置变更，所以 `.github/workflows/ci.yml` 一个字节没改，
+     编译证据来自本机真跑（命令、产物大小与 sha256 记在 `docs/PROGRESS.md` 与 `docs/FIRMWARE.md` §3）。
+     「接不接 CI」是要人点头的事，不自行扩权。
+  10. **灯效只做占位**：`lb_led.c` 不调用任何 GPIO / RMT 接口，只打日志说「未驱动任何灯」；
+     配置里 `firmware.led_driver` 只允许 `placeholder`，写成别的值校验直接报 `LB-F002`。
+
+- **影响**：
+  - 新增 `config/`（板级配置 + schema）、`firmware/`（ESP-IDF 工程）、`src/liveblocks/firmware/`
+    （`board` / `headers` / `hosttool` / `docs`）、`scripts/build_firmware.sh`、`docs/FIRMWARE.md`；
+    CLI 多一个 `firmware` 组（`check` / `pins` / `headers` / `scan`）；新增 5 个测试文件
+    `tests/test_firmware_{board,frames,parity,build,docs}.py`。
+  - 对已有代码的唯一改动是**加法式**：`src/liveblocks/cli.py` 加一个子命令组、`tests/conftest.py`
+    加一个「主机编译固件」的 session 夹具；`src/liveblocks/hw/` 一个字节没动。
+  - `.gitignore` 多三条（`firmware/generated/*.h`、`firmware/sdkconfig`、`firmware/sdkconfig.old`）。
+  - **未改**：`docs/ROADMAP.md`（范围与优先级）、`docs/HW.md`（HW-5 心跳周期仍需实测后回填）、
+    `docs/PROTOCOL.md`、`.github/workflows/*`。
+
+- **待办**：① 是否把 `bash scripts/build_firmware.sh` 接进 CI（需人授权，本单排除）；
+  ② `docs/FIRMWARE.md` §7 的 F-1…F-5（烧写、串口日志、复位自恢复、引脚核对、心跳周期抖动）
+  由人实测后回填，代理不得代填；③ 心跳周期实测后回填 `docs/HW.md` HW-5 与配置的
+  `heartbeat_ms_verified`；④ `STEP` 的业务实现与真实灯效驱动属后续固件任务；
+  ⑤ 真实串口入口接进 `liveblocks hw` 属 LB-020。
+
 ## 待决问题索引（对应 `docs/ARCHITECTURE.md` §4）
 
 | 问题 | 内容 | 阻塞谁 |
