@@ -1,0 +1,126 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Calibration",
+  "calibration_id": "calib-checkerboard-synthetic",
+  "created_at": "2026-11-24T00:00:00Z",
+  "status": "synthetic",
+  "target": {
+    "name": "checkerboard-9x6-25mm",
+    "kind": "checkerboard",
+    "squares_x": 9,
+    "squares_y": 6,
+    "square_mm": 25.0,
+    "margin_mm": 20.0,
+    "inner_corners": 40
+  },
+  "image": {
+    "width": 480,
+    "height": 360
+  },
+  "image_count": 10,
+  "point_count": 400,
+  "intrinsics": {
+    "fx": 459.618394,
+    "fy": 461.578544,
+    "cx": 239.223603,
+    "cy": 179.783826
+  },
+  "distortion": {
+    "model": "plumb_bob",
+    "k1": -0.260709031,
+    "k2": 0.081441945,
+    "p1": 0.006008963,
+    "p2": -0.003977558
+  },
+  "reprojection_error": {
+    "rms_px": 0.109345,
+    "max_px": 0.629295,
+    "point_count": 400,
+    "per_view_rms_px": [
+      0.136546,
+      0.1665,
+      0.040601,
+      0.072912,
+      0.159275,
+      0.064505,
+      0.076475,
+      0.131285,
+      0.082139,
+      0.082899
+    ]
+  },
+  "views": [
+    {
+      "view_id": "view-00",
+      "corners": 40,
+      "rms_px": 0.136546,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-01",
+      "corners": 40,
+      "rms_px": 0.1665,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-02",
+      "corners": 40,
+      "rms_px": 0.040601,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-03",
+      "corners": 40,
+      "rms_px": 0.072912,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-04",
+      "corners": 40,
+      "rms_px": 0.159275,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-05",
+      "corners": 40,
+      "rms_px": 0.064505,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-06",
+      "corners": 40,
+      "rms_px": 0.076475,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-07",
+      "corners": 40,
+      "rms_px": 0.131285,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-08",
+      "corners": 40,
+      "rms_px": 0.082139,
+      "method": "checkerboard-grid"
+    },
+    {
+      "view_id": "view-09",
+      "corners": 40,
+      "rms_px": 0.082899,
+      "method": "checkerboard-grid"
+    }
+  ],
+  "source": {
+    "kind": "synthetic",
+    "preset": "checkerboard",
+    "preset_version": "0.0.1",
+    "seed": 20261124,
+    "generator": "liveblocks.synth",
+    "note": "合成数据，非真实摄像头标定结论"
+  },
+  "notes": [
+    "本文件由合成场景生成：真值内参/畸变已知，只用于回归与算法自检。",
+    "真实摄像头的标定数字需要人按 docs/CALIB.md §8 的步骤实测，代理不得代填。"
+  ]
+}

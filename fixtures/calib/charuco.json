@@ -1,0 +1,140 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "Calibration",
+  "calibration_id": "calib-charuco-synthetic",
+  "created_at": "2026-11-24T00:00:00Z",
+  "status": "synthetic",
+  "target": {
+    "name": "charuco-8x6-20mm",
+    "kind": "charuco",
+    "squares_x": 8,
+    "squares_y": 6,
+    "square_mm": 20.0,
+    "margin_mm": 15.0,
+    "inner_corners": 35,
+    "marker_mm": 12.0,
+    "dictionary": "DICT_4X4_50",
+    "markers": 24
+  },
+  "image": {
+    "width": 480,
+    "height": 360
+  },
+  "image_count": 9,
+  "point_count": 314,
+  "intrinsics": {
+    "fx": 455.405831,
+    "fy": 457.364384,
+    "cx": 237.639659,
+    "cy": 181.388184
+  },
+  "distortion": {
+    "model": "plumb_bob",
+    "k1": -0.244813393,
+    "k2": 0.110718328,
+    "p1": 0.005089019,
+    "p2": -0.00402757
+  },
+  "reprojection_error": {
+    "rms_px": 0.113311,
+    "max_px": 0.489714,
+    "point_count": 314,
+    "per_view_rms_px": [
+      0.125212,
+      0.118061,
+      0.084998,
+      0.124335,
+      0.070561,
+      0.114428,
+      0.095387,
+      0.14686,
+      0.120787
+    ]
+  },
+  "views": [
+    {
+      "view_id": "view-00",
+      "corners": 35,
+      "rms_px": 0.125212,
+      "method": "charuco-grid+markers",
+      "markers": 31,
+      "marker_matches": 22
+    },
+    {
+      "view_id": "view-01",
+      "corners": 35,
+      "rms_px": 0.118061,
+      "method": "charuco-grid+markers",
+      "markers": 33,
+      "marker_matches": 15
+    },
+    {
+      "view_id": "view-02",
+      "corners": 35,
+      "rms_px": 0.084998,
+      "method": "charuco-grid+markers",
+      "markers": 32,
+      "marker_matches": 19
+    },
+    {
+      "view_id": "view-03",
+      "corners": 35,
+      "rms_px": 0.124335,
+      "method": "charuco-grid+markers",
+      "markers": 31,
+      "marker_matches": 18
+    },
+    {
+      "view_id": "view-04",
+      "corners": 35,
+      "rms_px": 0.070561,
+      "method": "charuco-grid+markers",
+      "markers": 33,
+      "marker_matches": 15
+    },
+    {
+      "view_id": "view-05",
+      "corners": 35,
+      "rms_px": 0.114428,
+      "method": "charuco-grid+markers",
+      "markers": 36,
+      "marker_matches": 18
+    },
+    {
+      "view_id": "view-06",
+      "corners": 35,
+      "rms_px": 0.095387,
+      "method": "charuco-grid+markers",
+      "markers": 33,
+      "marker_matches": 16
+    },
+    {
+      "view_id": "view-07",
+      "corners": 35,
+      "rms_px": 0.14686,
+      "method": "charuco-grid+markers",
+      "markers": 29,
+      "marker_matches": 19
+    },
+    {
+      "view_id": "view-08",
+      "corners": 35,
+      "rms_px": 0.120787,
+      "method": "charuco-grid+markers",
+      "markers": 26,
+      "marker_matches": 22
+    }
+  ],
+  "source": {
+    "kind": "synthetic",
+    "preset": "charuco",
+    "preset_version": "0.0.1",
+    "seed": 20261125,
+    "generator": "liveblocks.synth",
+    "note": "合成数据，非真实摄像头标定结论"
+  },
+  "notes": [
+    "本文件由合成场景生成：真值内参/畸变已知，只用于回归与算法自检。",
+    "真实摄像头的标定数字需要人按 docs/CALIB.md §8 的步骤实测，代理不得代填。"
+  ]
+}

@@ -126,3 +126,95 @@ def serve_cam(tmp_path: Path):
     )
     app = ServeCamApp(config)
     return SimpleNamespace(app=app, client=TestClient(app), live_dir=tmp_path / "live", config=config)
+
+
+# --- LB-031 标定的公共夹具 -----------------------------------------------------------
+
+#: 标定文件 golden 目录（``fixtures/calib/*.json``，见 ``fixtures/README.md`` §11）。
+CALIB_DIR = FIXTURES_DIR / "calib"
+
+#: 测试用的最小预设参数（240×180、6×5 棋盘、5 个视图）：一次跑完约 2.5 秒，
+#: 让「采集 → 检角点 → 标定 → 重复性」这条链路在普通测试里也能真跑，而不是打桩。
+SMALL_PRESET_KWARGS = {
+    "name": "small",
+    "description": "测试用小预设（240×180、6×5 棋盘、5 个视图）",
+    "target": dict(
+        name="checkerboard-6x5-20mm",
+        kind="checkerboard",
+        squares_x=6,
+        squares_y=5,
+        square_mm=20.0,
+        margin_mm=15.0,
+    ),
+    "width": 240,
+    "height": 180,
+    "seed": 777,
+    "true_lens": dict(
+        fx=230.0, fy=231.0, cx=119.5, cy=89.5, k1=-0.2, k2=0.05, p1=0.004, p2=-0.003
+    ),
+    "lighting": dict(gain=1.0, vignette=0.08, noise_sigma=1.5, blur_radius_px=0),
+    "views": [
+        dict(x_mm=0, y_mm=0, z_mm=210, yaw_deg=3, pitch_deg=16, roll_deg=-5),
+        dict(x_mm=-24, y_mm=12, z_mm=195, yaw_deg=-12, pitch_deg=-14, roll_deg=8),
+        dict(x_mm=22, y_mm=-14, z_mm=225, yaw_deg=14, pitch_deg=11, roll_deg=4),
+        dict(x_mm=-12, y_mm=-16, z_mm=190, yaw_deg=10, pitch_deg=18, roll_deg=-9),
+        dict(x_mm=14, y_mm=16, z_mm=215, yaw_deg=-10, pitch_deg=-16, roll_deg=7),
+    ],
+    "static": dict(
+        pose=dict(x_mm=3, y_mm=-2, z_mm=190, yaw_deg=6, pitch_deg=15, roll_deg=-5),
+        repeats=2,
+        seed=888,
+    ),
+    "thresholds": dict(
+        reprojection_rms_px=0.5,
+        repeatability_mean_px=0.5,
+        repeatability_max_px=2.0,
+        focal_relative_error=0.03,
+        principal_point_px=8.0,
+    ),
+}
+
+
+def make_small_preset():
+    """构造测试用的小预设（``run_preset`` 接受任意 :class:`CalibPreset`，不一定要在数据文件里）。"""
+    from liveblocks.calib.presets import CalibPreset, Lighting, StaticScene, Thresholds
+    from liveblocks.synth.calibtarget import CalibTarget
+    from liveblocks.synth.geometry import Pose
+    from liveblocks.synth.lens import LensModel
+
+    kwargs = SMALL_PRESET_KWARGS
+    return CalibPreset(
+        name=kwargs["name"],
+        description=kwargs["description"],
+        target=CalibTarget.from_dict(kwargs["target"] | {"name": kwargs["target"]["name"]}),
+        width=kwargs["width"],
+        height=kwargs["height"],
+        seed=kwargs["seed"],
+        true_lens=LensModel(**kwargs["true_lens"]),
+        lighting=Lighting(**kwargs["lighting"]),
+        views=tuple(Pose(**view) for view in kwargs["views"]),
+        static=StaticScene(
+            pose=Pose(**kwargs["static"]["pose"]),
+            repeats=kwargs["static"]["repeats"],
+            seed=kwargs["static"]["seed"],
+        ),
+        thresholds=Thresholds(**kwargs["thresholds"]),
+    )
+
+
+@pytest.fixture(scope="session")
+def calib_small_preset():
+    return make_small_preset()
+
+
+@pytest.fixture(scope="session")
+def calib_small_outcome(calib_small_preset):
+    """小预设真跑一遍（约 2.5 秒），多个测试文件共享同一份结果。"""
+    from liveblocks.calib.report import run_preset
+
+    return run_preset(calib_small_preset)
+
+
+@pytest.fixture(scope="session")
+def calib_dir() -> Path:
+    return CALIB_DIR

@@ -8,6 +8,7 @@
 - **LB-008 调试视图**可以把一份 §8 运行记录（JSONL）渲染成**一屏五层**：帧叠加（原帧 + 标记框 / 卡片中心 / 槽位）、排列、AST、IR、事件流 + 分层耗时，支持**回放**与**单步**；坏记录只给可见的 `LB-U0xx` 提示而不崩溃。它**只读**、只服务开发者，不做产品级 UI、不对外发布。
 - **LB-009 端到端回归**把整条软件闭环收成一条命令：`liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并把 §8 运行记录落盘，`liveblocks e2e regression` 再做记录形状校验、**黄金基准**比对、**破坏注入自检**与**固定时间上界**（整份 ≤ 60 s、单条记录 ≤ 20 s），失败时打印失败摘要并点名「最早失败层」。运行记录的生产在包内完成，不依赖 LB-008 为夹具拼记录的脚本。
 - **LB-030 摄像头采集台**把「真实帧从哪来」这件事先接上：一条命令（`liveblocks serve-cam serve`）起本地服务，页面用浏览器 `getUserMedia` 选任意摄像头（手机前置/后置、笔记本内置、USB UVC），支持**单帧抓拍**与**连续取帧**；`POST /api/frame` 返回 §3 `CardCandidateList` 与识别叠加图，`POST /api/capture` 把当前帧与人工标注（卡片 id、角色、可选角点）落成 `fixtures/live/<时间戳>/`——**这份目录能被 `recognize report` 直接消费**；页面能标「这帧识别错了」，坏样本单独归档到 `fixtures/live/refused/`。零新增依赖（标准库 `wsgiref` + 内联 CSS/JS 的单文件页面）。
+- **LB-031 标定（算法侧）**把「物理世界 → 图像」这一层接上：`liveblocks calibrate report` 一条命令在**合成畸变场景**（真值内参已知）上跑完「棋盘格 / ChArUco 标定 → 重投影误差 → 校正前后角点重复性（均值 / 最大值，像素）」，退出码 0；标定结果写成带内参、`plumb_bob` 畸变、重投影误差、图像尺寸、标定图数量与时间戳的 JSON，并能填进 `Frame.intrinsics/distortion`；合成器也多了**镜头畸变模型**（径向 + 切向），按真值内参渲染带畸变的场景作为可复现回归数据。真实摄像头的标定数字**不在验收内**（`docs/CALIB.md` §8 写了人怎么验）。
 - **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。LB-030 的离线验收（§3 逐字段一致、采集目录进 `recognize report`、页面无外网依赖）有真跑证据；但「手机后置摄像头 + 实体卡看到叠加框与卡片 id」这一条**待人工验证**（`docs/CAPTURE.md` §6 写了人怎么验）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
@@ -310,6 +311,45 @@ liveblocks recognize report --dir fixtures/live/<时间戳>
 实体卡 = 待人工验证**。规范与错误码见 [docs/CAPTURE.md](docs/CAPTURE.md)（草案
 `capture_version` 0.0.1），取舍见 [docs/DECISIONS.md](docs/DECISIONS.md) D-021。
 
+## 标定与畸变校正（LB-031）
+
+合成场景上的标定全流程：棋盘格（9×6 / 25 mm）与 ChArUco（8×6 / 20 mm / `DICT_4X4_50`）两条流程、
+标定文件 JSON、`Frame` 的内参与畸变填充路径，外加合成器的**镜头畸变模型**（径向 `k1,k2` + 切向 `p1,p2`）。
+
+```bash
+# 一条命令复现全部验收数字（合成场景，约 36 秒）：重投影误差 + 校正前后角点重复性
+liveblocks calibrate report --preset all --golden fixtures/calib
+
+# 看一帧的角点检测（棋盘格 / ChArUco 两条流程）
+liveblocks calibrate corners --image fixtures/scenes/normal.png --target checkerboard-9x6-25mm
+
+# 用目录里的图像标定（真实采集走这条；人来做，见 docs/CALIB.md §8）
+liveblocks calibrate run --dir fixtures/live/<时间戳> --target checkerboard-9x6-25mm --out calib.json
+
+# 把标定填进帧、或把图校正成理想针孔图
+liveblocks calibrate frame --calib calib.json --image frame.png
+liveblocks calibrate undistort --calib calib.json --image frame.png --out frame-fixed.png
+
+# 校验一份标定文件
+liveblocks calibrate validate --calib calib.json
+```
+
+实测（合成场景，`--preset all` 的真跑输出）：
+
+- 棋盘格预设：重投影 **RMS 0.109 px**（最大 0.629 px），10 张标定图 / 400 个角点；
+  估计内参 `fx=459.618 fy=461.579 cx=239.224 cy=179.784`（真值 `460 / 462 / 239.5 / 179.5`）；
+  同一静态场景连拍 4 次的角点重复性：校正前 0.021 / 0.191 px → 校正后 0.023 / 0.206 px（均值 / 最大值）；
+  单个针孔单应的拟合残差（校正是否有效）：0.800 px → 0.095 px。
+- ChArUco 预设：重投影 **RMS 0.113 px**（最大 0.490 px），9 张标定图 / 314 个角点，
+  标记 id 与棋盘编号逐一对上（每帧 10~22 个）。
+- **重复性不会因为校正而变好**——它由检角算法与噪声决定；校正真正改善的是「画面能被针孔模型解释」。
+  报告把两组数字都印出来（口径见 `docs/CALIB.md` §7.6）。
+- 不做：不冻结摄像头型号、不声明任何真实设备的重投影误差/可用距离、不做立体或手眼标定；
+  真实摄像头的标定数字 = **待人工验证**（`docs/CALIB.md` §8 给了人工步骤）。
+
+规范与格式见 [docs/CALIB.md](docs/CALIB.md)（草案 `0.0.1`），取舍见
+[docs/DECISIONS.md](docs/DECISIONS.md) D-022。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -323,6 +363,7 @@ liveblocks recognize report --dir fixtures/live/<时间戳>
 | [docs/UI.md](docs/UI.md) | S7b 调试视图规范（一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表），**草案** | 草案 v0.0.1（`ui_version` 0.0.1） |
 | [docs/E2E.md](docs/E2E.md) | 端到端回归规范（六阶段链路、§8 记录的生产、黄金基准、失败摘要、固定时间上界、`LB-E0xx` 码表），**草案** | 草案 v0.0.1（`e2e_version` 0.0.1） |
 | [docs/CAPTURE.md](docs/CAPTURE.md) | 摄像头采集台规范（`getUserMedia` 页面、`/api/frame` / `/api/capture` / `/api/captures`、`fixtures/live/` 落盘结构、`LB-C0xx` 码表、人工验证步骤），**草案** | 草案 v0.0.1（`capture_version` 0.0.1） |
+| [docs/CALIB.md](docs/CALIB.md) | 标定与畸变校正规范（棋盘格 / ChArUco 流程、标定文件 JSON、`Frame` 填充路径、`LB-B0xx` 码表、待人工验证步骤），**草案** | 草案 v0.0.1 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
@@ -355,9 +396,10 @@ liveblocks recognize report --dir fixtures/live/<时间戳>
 │   ├── parser/           # LB-005 语法层（Layout → Ast、P0 文法定义与自检报告）
 │   ├── ir/               # LB-006 规范化层（Ast → Ir、op 表、schema 校验与自检报告）
 │   ├── runtime/          # LB-007 模拟执行层（Ir → ExecEvent[] + ExecResult、虚拟时钟、limits、中断）
+│   ├── calib/            # LB-031 标定（角点检测 / 求解 / 标定文件 / Frame 填充 / 验收报告）
 │   └── serve_cam/        # LB-030 摄像头采集台（WSGI 服务 + 自包含页面 + fixtures/live 落盘）
 ├── tests/                # pytest 用例，testpaths = tests
-├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）+ exec/（执行夹具与 golden 事件流/最终状态）+ runs/ + e2e/ + live/（LB-030 实拍样本，不入库）
+├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）+ exec/（执行夹具与 golden 事件流/最终状态）+ runs/ + e2e/ + live/（LB-030 实拍样本，不入库）+ calib/（LB-031 标定文件 golden）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```

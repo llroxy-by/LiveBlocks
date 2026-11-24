@@ -48,6 +48,16 @@
     ``/api/captures`` 列样本，「这帧识别错了」的样本单独进 ``fixtures/live/refused/``）
   - ``liveblocks serve-cam page``    把自包含页面导出成单个 HTML（断网可打开，便于取证）
 
+- LB-031：``calibrate`` 子命令组（标定算法与标定文件格式）：
+
+  - ``liveblocks calibrate report``      一条命令复现全部验收数字：合成标定 → 重投影误差 →
+    校正前后角点重复性（均值 / 最大值，像素）→ 与入库 golden 比对
+  - ``liveblocks calibrate run --dir``   用目录里的图像（真实采集或合成）标定并写出标定文件
+  - ``liveblocks calibrate corners``     打印一帧的角点检测结果（棋盘格 / ChArUco）
+  - ``liveblocks calibrate undistort``   按标定把图校正成理想针孔图
+  - ``liveblocks calibrate frame``       打印按标定填好 ``intrinsics/distortion`` 的 §2 ``Frame``
+  - ``liveblocks calibrate validate``    校验一份标定文件
+
 ``--version`` 与 ``python -m liveblocks --version`` 的行为保持不变。
 """
 
@@ -84,6 +94,8 @@ DEFAULT_E2E_OUT = Path("runs/e2e")
 DEFAULT_LIVE_DIR = Path("fixtures/live")
 #: LB-030 本地服务的默认端口（只绑 127.0.0.1，不对外）。
 DEFAULT_SERVE_CAM_PORT = 8765
+#: LB-031 的标定文件 golden 目录（``fixtures/calib/*.json``，见 ``fixtures/README.md`` §11）。
+DEFAULT_CALIB_DIR = Path("fixtures/calib")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -495,6 +507,93 @@ def build_parser() -> argparse.ArgumentParser:
     )
     page_cmd.add_argument("--out", type=Path, default=None, help="写到文件；默认打印到标准输出")
     page_cmd.set_defaults(handler=_cmd_serve_cam_page)
+
+    calibrate = subparsers.add_parser(
+        "calibrate",
+        help="标定（LB-031）：棋盘格 / ChArUco 流程、标定文件、Frame 内参与畸变",
+        description=(
+            "标定算法与标定文件格式：合成场景跑全流程（重投影误差 + 校正前后角点重复性），"
+            "用目录里的图像标定，写/校验标定文件，把标定填进 Frame 的内参与畸变。"
+            "真实摄像头的标定数字不在本命令的结论内（见 docs/CALIB.md §8）。"
+        ),
+    )
+    calibrate_sub = calibrate.add_subparsers(dest="calibrate_command", required=True)
+
+    cal_report = calibrate_sub.add_parser(
+        "report", help="一条命令复现全部验收数字（合成场景；可选与 golden 快照比对）"
+    )
+    cal_report.add_argument(
+        "--preset", default="all", help="预设名，逗号分隔；all = 全部（默认）"
+    )
+    cal_report.add_argument(
+        "--created-at",
+        default=None,
+        help="标定文件里的时间戳（ISO8601）；默认用固定值以保证报告可复现（见 docs/CALIB.md §4）",
+    )
+    cal_report.add_argument(
+        "--out-dir", type=Path, default=None, help="把生成的标定文件写到该目录"
+    )
+    cal_report.add_argument(
+        "--golden",
+        type=Path,
+        default=None,
+        help=f"与目录里的 golden 标定文件逐字节比对（如 {DEFAULT_CALIB_DIR}）",
+    )
+    cal_report.add_argument("--json", type=Path, default=None, help="把报告另存为 JSON")
+    cal_report.set_defaults(handler=_cmd_calibrate_report)
+
+    cal_run = calibrate_sub.add_parser(
+        "run", help="用目录里的图像标定（真实采集或合成），写出标定文件"
+    )
+    cal_run.add_argument("--dir", type=Path, required=True, help="图像目录（*.png）")
+    cal_run.add_argument(
+        "--target", required=True, help="标定板名（见 calibrate targets）"
+    )
+    cal_run.add_argument("--out", type=Path, default=None, help="标定文件输出路径；默认打印到标准输出")
+    cal_run.add_argument("--created-at", default=None, help="时间戳（ISO8601）；默认取当前 UTC 时间")
+    cal_run.add_argument(
+        "--source-kind",
+        choices=("capture", "synthetic"),
+        default="capture",
+        help="声明这批图的来源（默认 capture：真实采集）",
+    )
+    cal_run.add_argument(
+        "--calibration-id", default=None, help="标定文件里的 calibration_id（默认按目录名生成）"
+    )
+    cal_run.set_defaults(handler=_cmd_calibrate_run)
+
+    cal_corners = calibrate_sub.add_parser(
+        "corners", help="打印一帧的角点检测结果（棋盘格 / ChArUco 两条流程）"
+    )
+    cal_corners.add_argument("--image", type=Path, required=True, help="PNG 灰度图")
+    cal_corners.add_argument("--target", required=True, help="标定板名（见 calibrate targets）")
+    cal_corners.add_argument("--json", type=Path, default=None, help="另存为 JSON")
+    cal_corners.set_defaults(handler=_cmd_calibrate_corners)
+
+    cal_undistort = calibrate_sub.add_parser(
+        "undistort", help="按标定把图校正成理想针孔图（写出 PNG）"
+    )
+    cal_undistort.add_argument("--calib", type=Path, required=True, help="标定文件")
+    cal_undistort.add_argument("--image", type=Path, required=True, help="输入 PNG")
+    cal_undistort.add_argument("--out", type=Path, required=True, help="输出 PNG")
+    cal_undistort.set_defaults(handler=_cmd_calibrate_undistort)
+
+    cal_frame = calibrate_sub.add_parser(
+        "frame", help="打印按标定填好 intrinsics / distortion 的 §2 Frame"
+    )
+    cal_frame.add_argument("--calib", type=Path, required=True, help="标定文件")
+    cal_frame.add_argument("--image", type=Path, required=True, help="输入 PNG")
+    cal_frame.add_argument(
+        "--undistort", action="store_true", help="同时把像素校正成理想针孔图（distortion 归零）"
+    )
+    cal_frame.set_defaults(handler=_cmd_calibrate_frame)
+
+    cal_validate = calibrate_sub.add_parser("validate", help="校验一份标定文件")
+    cal_validate.add_argument("--calib", type=Path, required=True, help="标定文件")
+    cal_validate.set_defaults(handler=_cmd_calibrate_validate)
+
+    cal_targets = calibrate_sub.add_parser("targets", help="列出内置标定板与合成预设")
+    cal_targets.set_defaults(handler=_cmd_calibrate_targets)
 
     return parser
 
@@ -1258,6 +1357,234 @@ def report_to_dict(report) -> dict[str, object]:
             for ok, criterion, evidence in report.acceptance()
         ],
     }
+
+
+
+def _now_utc() -> str:
+    """当前 UTC 时间（ISO8601，秒级）。标定文件的时间戳由调用方显式给出，便于复现。"""
+    import datetime
+
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _calib_targets() -> dict:
+    from .calib.presets import load_presets
+
+    presets, _version = load_presets()
+    return {preset.target.name: preset.target for preset in presets.values()}
+
+
+def _resolve_calib_target(name: str):
+    targets = _calib_targets()
+    try:
+        return targets[name]
+    except KeyError:
+        raise SystemExit(
+            f"未知标定板 {name!r}；可用：{', '.join(sorted(targets))}（见 liveblocks calibrate targets）"
+        ) from None
+
+
+def _cmd_calibrate_targets(args: argparse.Namespace) -> int:
+    from .calib.presets import load_presets
+
+    presets, version = load_presets()
+    print(f"标定板（calib_presets.json {version}）：")
+    seen: dict[str, object] = {}
+    for preset in presets.values():
+        seen[preset.target.name] = preset.target
+    for name in sorted(seen):
+        print(f"  {seen[name].describe()}")
+    print("合成预设：")
+    for name in sorted(presets):
+        preset = presets[name]
+        print(
+            f"  {name:<14} {preset.width}×{preset.height}，{len(preset.views)} 个视图，"
+            f"静态重复 {preset.static.repeats} 次 —— {preset.description}"
+        )
+    return 0
+
+
+def _cmd_calibrate_report(args: argparse.Namespace) -> int:
+    import json
+
+    from .calib.presets import load_presets
+    from .calib.report import DEFAULT_CREATED_AT, build_report, format_report, write_calibrations
+
+    presets, _version = load_presets()
+    if args.preset.strip() == "all":
+        names = sorted(presets)
+    else:
+        names = [part.strip() for part in args.preset.split(",") if part.strip()]
+    created_at = args.created_at or DEFAULT_CREATED_AT
+    try:
+        report = build_report(names, created_at=created_at, golden_dir=args.golden)
+    except Exception as error:  # 报告跑不起来时给出人能看懂的一句话
+        print(f"标定报告无法完成：{error}", file=sys.stderr)
+        return 1
+    print(format_report(report), end="")
+    if args.out_dir is not None:
+        for path in write_calibrations(report, args.out_dir):
+            print(f"标定文件已写入 {path}")
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"报告已写入 {args.json}")
+    return 0 if report.passes() else 1
+
+
+def _cmd_calibrate_run(args: argparse.Namespace) -> int:
+    import json
+
+    from .calib.dataset import DatasetError, calibrate_directory, summarize
+
+    target = _resolve_calib_target(args.target)
+    created_at = args.created_at or _now_utc()
+    try:
+        outcome = calibrate_directory(
+            args.dir,
+            target,
+            created_at=created_at,
+            calibration_id=args.calibration_id,
+            source_kind=args.source_kind,
+            notes=(
+                "由 liveblocks calibrate run 生成。真实摄像头的标定数字必须由人按 "
+                "docs/CALIB.md §8 实测，代理不得代填。"
+                if args.source_kind == "capture"
+                else "合成图像标定，仅用于回归。",
+            ),
+        )
+    except DatasetError as error:
+        print(f"标定失败：{error}", file=sys.stderr)
+        return 1
+    summary = summarize(outcome)
+    print(
+        f"{summary['calibration_id']}：{summary['images']} 张图，重投影 RMS "
+        f"{summary['reprojection_rms_px']:.4f} px（最大 {summary['reprojection_max_px']:.4f} px），"
+        f"剔除外点 {summary['dropped_points']} 个"
+    )
+    print(f"  {outcome.calibration.lens.describe()}")
+    for note in outcome.skipped:
+        print(f"  ! 跳过 {note}")
+    if args.out is not None:
+        outcome.calibration.write(args.out)
+        print(f"标定文件已写入 {args.out}")
+    else:
+        sys.stdout.write(outcome.calibration.to_json())
+    return 0
+
+
+def _cmd_calibrate_corners(args: argparse.Namespace) -> int:
+    import json
+
+    from .calib.corners import detect_corners
+    from .synth.png import decode_gray
+    from .vision.image import GrayImage
+
+    target = _resolve_calib_target(args.target)
+    width, height, pixels = decode_gray(args.image.read_bytes())
+    corner_set = detect_corners(GrayImage(width, height, pixels), target)
+    document = corner_set.to_dict()
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        print(f"角点已写入 {args.json}", file=sys.stderr)
+    print(
+        f"{args.image}: 方法 {corner_set.method}，黑格 {corner_set.squares}，"
+        f"角点 {len(corner_set.corners)}/{len(target.inner_corners())}"
+        + (f"，标记 {corner_set.markers}（id 对上 {corner_set.marker_matches}）" if corner_set.markers else ""),
+        file=sys.stderr,
+    )
+    for entry in corner_set.diagnostics:
+        print(f"  {entry['code']} {entry['message']}", file=sys.stderr)
+    sys.stdout.write(json.dumps(document, ensure_ascii=False, indent=2) + "\n")
+    return 0 if len(corner_set.corners) >= 6 else 1
+
+
+def _cmd_calibrate_undistort(args: argparse.Namespace) -> int:
+    from .calib.format import CalibrationFile, CalibrationFileError
+    from .calib.frames import undistort_frame
+    from .synth.png import decode_gray
+    from .vision.frame import Frame
+    from .vision.image import GrayImage
+
+    try:
+        calibration = CalibrationFile.load(args.calib)
+    except CalibrationFileError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    width, height, pixels = decode_gray(args.image.read_bytes())
+    frame = Frame(
+        frame_id=args.image.stem,
+        image=GrayImage(width, height, pixels),
+        image_ref=args.image.name,
+    )
+    try:
+        corrected = undistort_frame(frame, calibration)
+    except ValueError as error:
+        print(f"无法校正：{error}", file=sys.stderr)
+        return 1
+    from .synth.png import encode_gray
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_bytes(encode_gray(corrected.width, corrected.height, corrected.image.pixels))
+    print(f"已写出校正图 {args.out}（{corrected.width}×{corrected.height}，畸变模型 {calibration.lens.model}）")
+    return 0
+
+
+def _cmd_calibrate_frame(args: argparse.Namespace) -> int:
+    import json
+
+    from .calib.format import CalibrationFile, CalibrationFileError
+    from .calib.frames import apply_to_frame, undistort_frame
+    from .synth.png import decode_gray
+    from .vision.frame import Frame
+    from .vision.image import GrayImage
+
+    try:
+        calibration = CalibrationFile.load(args.calib)
+    except CalibrationFileError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    width, height, pixels = decode_gray(args.image.read_bytes())
+    frame = Frame(
+        frame_id=args.image.stem,
+        image=GrayImage(width, height, pixels),
+        image_ref=args.image.name,
+    )
+    try:
+        filled = undistort_frame(frame, calibration) if args.undistort else apply_to_frame(frame, calibration)
+    except ValueError as error:
+        print(f"无法填数：{error}", file=sys.stderr)
+        return 1
+    sys.stdout.write(json.dumps(filled.to_dict(), ensure_ascii=False, indent=2) + "\n")
+    return 0
+
+
+def _cmd_calibrate_validate(args: argparse.Namespace) -> int:
+    import json
+
+    from .calib.format import CalibrationFileError, validation_diagnostics
+
+    try:
+        document = json.loads(args.calib.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"读不了 {args.calib}：{error}", file=sys.stderr)
+        return 1
+    problems = validation_diagnostics(document if isinstance(document, dict) else {})
+    if problems:
+        for entry in problems:
+            print(f"{entry['code']} {entry['message']}", file=sys.stderr)
+        print(f"不合格：{len(problems)} 处问题", file=sys.stderr)
+        return 1
+    from .calib.format import CalibrationFile
+
+    calibration = CalibrationFile.from_dict(document)
+    print(f"合格：{calibration.describe()}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
