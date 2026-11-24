@@ -56,6 +56,13 @@
   - ``liveblocks hw unplug-test --ir <json>`` 拔线复现：断连错误事件不阻塞、可重连继续跑
   - ``liveblocks hw frames``                  打印串口帧格式与命令 / 事件表（供 LB-034 固件复用）
 
+- LB-034：``firmware`` 子命令组（ESP32-C3 SuperMini 固件骨架的 Python 侧，**不能烧写**）：
+
+  - ``liveblocks firmware check``    校验板级配置（与 ``config/board.schema.json`` 同口径）并列待实测项
+  - ``liveblocks firmware pins``     打印引脚表；引脚只来自 ``config/board.esp32c3-supermini.json``
+  - ``liveblocks firmware headers``  生成 C 头文件（``lb_board_config.h`` / ``lb_protocol.h``，不入库）
+  - ``liveblocks firmware scan``     扫描固件源码里的裸 GPIO 数字（``LB-F005``）
+
 - LB-031：``calibrate`` 子命令组（标定算法与标定文件格式）：
 
   - ``liveblocks calibrate report``      一条命令复现全部验收数字：合成标定 → 重投影误差 →
@@ -591,6 +598,49 @@ def build_parser() -> argparse.ArgumentParser:
     hw_frames = hw_sub.add_parser("frames", help="打印串口帧格式、CRC 参数与命令 / 事件表")
     hw_frames.add_argument("--hexdump", action="store_true", help="额外打印一帧 HELLO 的十六进制形态")
     hw_frames.set_defaults(handler=_cmd_hw_frames)
+
+    firmware = subparsers.add_parser(
+        "firmware",
+        help="固件骨架（LB-034）：板级配置校验、引脚表、生成 C 头文件、裸 GPIO 扫描",
+        description=(
+            "ESP32-C3 SuperMini 固件骨架的 Python 侧：校验 config/board.esp32c3-supermini.json、"
+            "把配置与协议常量生成成 C 头文件、扫描固件源码里有没有裸 GPIO 数字。"
+            "★ 这里**没有**任何能烧写的代码；烧写、串口日志与复位自恢复属「待人工验证」"
+            "（docs/FIRMWARE.md §7）。"
+        ),
+    )
+    firmware_sub = firmware.add_subparsers(dest="firmware_command", required=True)
+
+    firmware_check = firmware_sub.add_parser(
+        "check", help="校验板级配置（schema 同口径），打印引脚表与待实测项"
+    )
+    firmware_check.add_argument(
+        "--config", type=Path, default=Path("config/board.esp32c3-supermini.json"), help="板级配置 JSON"
+    )
+    firmware_check.set_defaults(handler=_cmd_firmware_check)
+
+    firmware_pins = firmware_sub.add_parser("pins", help="打印板级配置里的引脚表（含「待实测」标记）")
+    firmware_pins.add_argument(
+        "--config", type=Path, default=Path("config/board.esp32c3-supermini.json"), help="板级配置 JSON"
+    )
+    firmware_pins.set_defaults(handler=_cmd_firmware_pins)
+
+    firmware_headers = firmware_sub.add_parser(
+        "headers", help="从板级配置与 hw 协议层生成 C 头文件（lb_board_config.h / lb_protocol.h）"
+    )
+    firmware_headers.add_argument(
+        "--config", type=Path, default=Path("config/board.esp32c3-supermini.json"), help="板级配置 JSON"
+    )
+    firmware_headers.add_argument(
+        "--out", type=Path, default=Path("firmware/generated"), help="输出目录（默认 firmware/generated）"
+    )
+    firmware_headers.set_defaults(handler=_cmd_firmware_headers)
+
+    firmware_scan = firmware_sub.add_parser(
+        "scan", help="扫描固件源码里的裸 GPIO 数字（LB-F005），零违规才返回 0"
+    )
+    firmware_scan.add_argument("--root", type=Path, default=None, help="仓库根目录（默认当前仓库）")
+    firmware_scan.set_defaults(handler=_cmd_firmware_scan)
 
     calibrate = subparsers.add_parser(
         "calibrate",
@@ -2103,6 +2153,89 @@ def _cmd_cardsheet_spec(args: argparse.Namespace) -> int:
             print(f"  {entry['code']} {entry['severity']} {entry['message']}", file=sys.stderr)
         print(f"  文档核对：{args.doc} 有 {len(gaps)} 项缺口", file=sys.stderr)
         return 1
+    return 0
+
+
+def _cmd_firmware_check(args: argparse.Namespace) -> int:
+    """校验板级配置（与 config/board.schema.json 同口径），并打印待实测项。"""
+    from .firmware import BoardConfig, BoardConfigError
+
+    try:
+        config = BoardConfig.load(args.config)
+    except BoardConfigError as error:
+        for problem in error.problems:
+            where = f" [{problem['path']}]" if problem.get("path") else ""
+            print(f"{problem['code']} {problem['message']}{where}", file=sys.stderr)
+        print(f"不合格：{args.config}（board schema 版本 0.0.1）", file=sys.stderr)
+        return 1
+    print(f"合格：{config.describe()}")
+    print(f"来源：{config.source_path}（sha256 {config.sha256[:16]}…，schema {config.schema_version}）")
+    pending = config.pending_items
+    if pending:
+        print(
+            f"待实测项 {len(pending)} 个：{', '.join(pending)}"
+            "（代理不得代填数值，步骤见 docs/FIRMWARE.md §7）"
+        )
+    return 0
+
+
+def _cmd_firmware_pins(args: argparse.Namespace) -> int:
+    """打印引脚表：引脚只有一个来源，代码里不许出现裸 GPIO 数字。"""
+    from .firmware import BoardConfig, BoardConfigError
+
+    try:
+        config = BoardConfig.load(args.config)
+    except BoardConfigError as error:
+        print(f"板级配置不合法：{error}", file=sys.stderr)
+        return 1
+    print(f"{config.board_name}（{config.board_id} / {config.mcu}）")
+    print(f"配置来源：{config.source_path}")
+    print("\n角色                  GPIO  极性    状态      说明")
+    for entry in config.pins:
+        polarity = "低有效" if entry.active_low else "高有效"
+        status = "已实测" if entry.verified else "待实测"
+        print(f"{entry.role:<20} {entry.gpio:>4}  {polarity:<4}  {status:<6}  {entry.note}")
+    print(
+        f"\n串口 UART{config.serial.uart}：tx=GPIO{config.serial.tx_gpio} "
+        f"rx=GPIO{config.serial.rx_gpio} @{config.serial.baud}"
+        f"（{'已实测' if config.serial.verified else '待实测'}）"
+    )
+    print(
+        f"心跳：{config.firmware.heartbeat_ms} ms"
+        f"（{'已实测' if config.firmware.heartbeat_ms_verified else '待实测'}）；"
+        f"灯效：driver={config.firmware.led_driver} led_count={config.firmware.led_count}"
+    )
+    print("\n记住：这里的数字只允许出现在 config/board.esp32c3-supermini.json 与生成的头文件里。")
+    return 0
+
+
+def _cmd_firmware_headers(args: argparse.Namespace) -> int:
+    """生成 C 头文件（板级配置 + 协议常量），两者都不入库。"""
+    from .firmware import BoardConfigError
+    from .firmware.headers import write_generated_headers
+
+    try:
+        protocol_path, board_path = write_generated_headers(args.out, config_path=args.config)
+    except BoardConfigError as error:
+        print(f"板级配置不合法，无法生成头文件：{error}", file=sys.stderr)
+        return 1
+    print(f"已生成 {protocol_path}（来自 src/liveblocks/hw/ 的线格式与命令 / 事件表）")
+    print(f"已生成 {board_path}（来自 {args.config}）")
+    return 0
+
+
+def _cmd_firmware_scan(args: argparse.Namespace) -> int:
+    """扫描固件源码里的裸 GPIO 数字（LB-F005）。"""
+    from .firmware import bare_gpio_violations, firmware_source_files
+
+    violations = bare_gpio_violations(args.root)
+    files = firmware_source_files(args.root)
+    if violations:
+        for entry in violations:
+            print(f"{entry['code']} {entry['path']}：{entry['message']}", file=sys.stderr)
+        print(f"不合格：{len(violations)} 处裸 GPIO 数字（引脚只能来自板级配置）", file=sys.stderr)
+        return 1
+    print(f"合格：{len(files)} 个固件源文件（.c/.h）里没有裸 GPIO 数字")
     return 0
 
 

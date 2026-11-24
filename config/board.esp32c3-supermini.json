@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.0.1",
+  "board_id": "esp32c3-supermini",
+  "board_name": "ESP32-C3 SuperMini",
+  "mcu": "esp32c3",
+  "config_status": "待实测：本文件里的引脚、串口与心跳参数都是设计默认值，没有在任何实物上核对过",
+  "pins": {
+    "status_led": {
+      "label": "板载状态 LED",
+      "gpio": 8,
+      "active_low": true,
+      "verified": false,
+      "note": "待实测：SuperMini 板载 LED 的实际 GPIO 与极性（部分批次是 WS2812 单灯）"
+    },
+    "led_strip_data": {
+      "label": "灯效数据线（WS2812 类灯带）",
+      "gpio": 3,
+      "active_low": false,
+      "verified": false,
+      "note": "待实测：灯带数据脚与 3.3V/5V 电平匹配（HARDWARE.md PN-3）"
+    },
+    "user_button": {
+      "label": "板载 BOOT 按键",
+      "gpio": 9,
+      "active_low": true,
+      "verified": false,
+      "note": "待实测：按键脚与上拉方式、是否兼作急停（HARDWARE.md PN-4）"
+    }
+  },
+  "serial": {
+    "uart": 0,
+    "tx_gpio": 21,
+    "rx_gpio": 20,
+    "baud": 115200,
+    "verified": false,
+    "note": "待实测：UART0 的 TX/RX 焊盘编号，以及与板载 USB-CDC 的实际走向"
+  },
+  "firmware": {
+    "heartbeat_ms": 1000,
+    "heartbeat_ms_verified": false,
+    "heartbeat_note": "待实测：心跳周期与延迟抖动（docs/HW.md §8 HW-5）",
+    "led_count": 1,
+    "led_driver": "placeholder"
+  }
+}

@@ -423,6 +423,39 @@ liveblocks hw unplug-test --ir fixtures/ir/golden/all-ops.json --unplug-after-st
 细节与缺口见 [docs/HW.md](docs/HW.md)（草案 `hw_protocol_version` 0.0.1）、
 [docs/DECISIONS.md](docs/DECISIONS.md) D-024 与 [docs/PROGRESS.md](docs/PROGRESS.md) §3。
 
+## 固件骨架（LB-034）
+
+ESP32-C3 SuperMini 的**最小固件骨架**（`firmware/` 下的 ESP-IDF 工程）：上电启动日志、串口心跳
+（事件 `0x87`）、命令分发占位（认命令号 + 回 `LB-H006`）、灯效驱动占位（只记日志，不驱动任何灯）。
+引脚、串口参数与心跳周期**全部来自** [config/board.esp32c3-supermini.json](config/board.esp32c3-supermini.json)
+（默认值一律标「待实测」），C 源码里**零硬编码 GPIO**：构建时先把它生成成 `lb_board_config.h`，
+协议常量同理从 `src/liveblocks/hw/` 生成 `lb_protocol.h`（两个生成物都不入库）。
+
+> **证据口径**：能编译（ESP-IDF v5.3.2 从零编出 `lb_firmware.bin`）与「心跳帧与 LB-033 的模拟器
+> 逐字节一致」都是离线可复现的证据，后者属**模拟器证据**。**烧写、串口日志、复位自恢复**要有板子
+> 才能验，一律「待人工验证」——人怎么验写在 [docs/FIRMWARE.md](docs/FIRMWARE.md) §7。
+
+```bash
+# 校验板级配置（与 config/board.schema.json 同口径）并列出待实测项
+python -m liveblocks firmware check
+
+# 打印引脚表（含「待实测」标记）
+python -m liveblocks firmware pins
+
+# 生成 C 头文件（不入库；构建脚本会自动做这一步）
+python -m liveblocks firmware headers
+
+# 扫描固件源码里的裸 GPIO 数字（零违规才返回 0）
+python -m liveblocks firmware scan
+
+# 只编译、不烧写（ESP-IDF v5.x；产物在 firmware/build/）
+bash scripts/build_firmware.sh
+```
+
+烧写由人来做（`cd firmware && idf.py -p /dev/ttyACM0 flash monitor`），步骤见
+[docs/FIRMWARE.md](docs/FIRMWARE.md) §5；取舍见 [docs/DECISIONS.md](docs/DECISIONS.md) D-025 与
+[docs/PROGRESS.md](docs/PROGRESS.md) §3。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -438,6 +471,7 @@ liveblocks hw unplug-test --ir fixtures/ir/golden/all-ops.json --unplug-after-st
 | [docs/CAPTURE.md](docs/CAPTURE.md) | 摄像头采集台规范（`getUserMedia` 页面、`/api/frame` / `/api/capture` / `/api/captures`、`fixtures/live/` 落盘结构、`LB-C0xx` 码表、人工验证步骤），**草案** | 草案 v0.0.1（`capture_version` 0.0.1） |
 | [docs/CARD-SPEC.md](docs/CARD-SPEC.md) | 实体卡片规范（卡面 / 标记 / 静区 / 基材 / 打印工艺 / 批次编号 / 质检项）+ A4 标记页生成器、`LB-S0xx` 码表、待实测与人工验证步骤，**草案** | 草案 v0.0.1（`sheet_version` 0.0.1） |
 | [docs/CALIB.md](docs/CALIB.md) | 标定与畸变校正规范（棋盘格 / ChArUco 流程、标定文件 JSON、`Frame` 填充路径、`LB-B0xx` 码表、待人工验证步骤），**草案** | 草案 v0.0.1 |
+| [docs/FIRMWARE.md](docs/FIRMWARE.md) | ESP32-C3 SuperMini 固件骨架（启动日志 / 串口心跳 / 命令分发占位 / 灯效占位）、板级配置与零硬编码 GPIO 的做法、构建与烧写步骤、`LB-F0xx` 码表、待人工验证清单，**草案** | 草案 v0.0.1（`firmware_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
@@ -472,9 +506,12 @@ liveblocks hw unplug-test --ir fixtures/ir/golden/all-ops.json --unplug-after-st
 │   ├── runtime/          # LB-007 模拟执行层（Ir → ExecEvent[] + ExecResult、虚拟时钟、limits、中断）
 │   ├── calib/            # LB-031 标定（角点检测 / 求解 / 标定文件 / Frame 填充 / 验收报告）
 │   └── serve_cam/        # LB-030 摄像头采集台（WSGI 服务 + 自包含页面 + fixtures/live 落盘）
+├── config/               # LB-034 板级配置（引脚的唯一来源）与它的 schema
+├── firmware/             # LB-034 ESP-IDF 工程（骨架固件）+ 主机侧编译工具
 ├── tests/                # pytest 用例，testpaths = tests
 ├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）+ exec/（执行夹具与 golden 事件流/最终状态）+ runs/ + e2e/ + live/（LB-030 实拍样本，不入库）+ calib/（LB-031 标定文件 golden）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
+├── scripts/build_firmware.sh # LB-034 固件构建（只编译、不烧写）
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```
 

@@ -26,3 +26,9 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# LB-034 固件骨架：生成的头文件、sdkconfig 与构建目录都不入库
+# （引脚与协议常量只能有一个来源：config/board.esp32c3-supermini.json 与 src/liveblocks/hw/）
+firmware/generated/*.h
+firmware/sdkconfig
+firmware/sdkconfig.old
