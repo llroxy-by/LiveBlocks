@@ -1,0 +1,491 @@
+{
+  "schema_version": "0.0.1",
+  "kind": "E2eBaseline",
+  "e2e_version": "0.0.1",
+  "seed": 20261123,
+  "generator": {
+    "name": "liveblocks.e2e",
+    "package_version": "0.0.1"
+  },
+  "time_bound_ms": 60000.0,
+  "record_bound_ms": 20000.0,
+  "note": "指纹 = sha256(canonical JSON(该层文档, 键排序) + 换行)；不含 RunHeader.timings_ms 与 wall_ms（记录时实测的墙钟耗时，换机器必然不同）",
+  "scenes": [
+    {
+      "name": "clipped",
+      "run_id": "run-e2e-clipped",
+      "image_sha256": "ef8f6e370a149672dbc7f138e3818add6a5f0e58532445aa67fe002827eae96a",
+      "ground_truth_sha256": "7836432ae225e3bde284c2a547ce5fdb7d8a04e3f9e59d1db1b4ab0f8e6d8178",
+      "lines": 10,
+      "counts": {
+        "synth": {
+          "cards_expected": 2,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 145675
+        },
+        "vision": {
+          "markers": 2,
+          "cards": 2,
+          "clipped": 2,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 1,
+          "slots": 2,
+          "diagnostics": 0
+        },
+        "parser": {
+          "statements": 1,
+          "diagnostics": 0
+        },
+        "ir": {
+          "steps": 1,
+          "diagnostics": 0
+        },
+        "exec": {
+          "events": 3,
+          "steps_executed": 1,
+          "status": "ok",
+          "virtual_ms": 10.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "e7cf248e3ad456d7b237e49078595e54056de0704baabb180ff355becbd183ed"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "81aefcaf47790f82a79cd47bb3d67cd157ae8205cdb8ec9e91d0612a3f1c89ce"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "cc160c661d6125ed2e3397cb759e20df2de8c050e7e7183acf762dfaf7c89bd0"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "2d201148e57f76519aba22c7a5c93e53b534b076ae69bd0bde1a5d6a64216f54"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecEvent",
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 4,
+          "sha256": "080ce9780376b7c8ec3027b51856850911ebc617320b03c9e9290d59a5cf5979"
+        }
+      }
+    },
+    {
+      "name": "low-light",
+      "run_id": "run-e2e-low-light",
+      "image_sha256": "2f038f7959720011b6f37c78dcea6085d0201b3fb0608eec3e9424a33f2160b7",
+      "ground_truth_sha256": "304b6d59fbba96fc8e3724531cf3fb2e3e812705dd4e8782b3e46219c9d44b53",
+      "lines": 8,
+      "counts": {
+        "synth": {
+          "cards_expected": 2,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 198969
+        },
+        "vision": {
+          "markers": 2,
+          "cards": 2,
+          "clipped": 0,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 1,
+          "slots": 2,
+          "diagnostics": 0
+        },
+        "parser": {
+          "statements": 0,
+          "diagnostics": 1
+        },
+        "ir": {
+          "steps": 0,
+          "diagnostics": 0
+        },
+        "exec": {
+          "events": 1,
+          "steps_executed": 0,
+          "status": "ok",
+          "virtual_ms": 0.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "69ac75e5a0f3201f56617f4e0efffd79b7ef4ca565f9b6153309868d6cdf6eb1"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "6c7f0e61220ef8abb7b550869c0550e941a32061c2f1543da6a17b3b67ed7133"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "f9d47bbbf7eca0d32accf81a9c3b037350df8461f244853ccabcc7f29c1f6fce"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "2e6ed069bc2a474d735031b1eec20337d8f392984de0ee68e096bb1d6b401545"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 2,
+          "sha256": "c948babfda3a65711ea60d5a436ec49539bde259a3001eaf5905c0e218595aed"
+        }
+      }
+    },
+    {
+      "name": "multi-row",
+      "run_id": "run-e2e-multi-row",
+      "image_sha256": "fb4d3def9752ee596af8e10e1572ab39699c20d34dd3e17816cb1424f4973652",
+      "ground_truth_sha256": "a42f31ff3bc9982969cca5cbaad28715ab44cbf8262ffc84badd17e986f852e8",
+      "lines": 8,
+      "counts": {
+        "synth": {
+          "cards_expected": 6,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 157244
+        },
+        "vision": {
+          "markers": 6,
+          "cards": 6,
+          "clipped": 0,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 2,
+          "slots": 6,
+          "diagnostics": 0
+        },
+        "parser": {
+          "statements": 0,
+          "diagnostics": 2
+        },
+        "ir": {
+          "steps": 0,
+          "diagnostics": 0
+        },
+        "exec": {
+          "events": 1,
+          "steps_executed": 0,
+          "status": "ok",
+          "virtual_ms": 0.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "29c373b6583d333a17b21aa2fe0d5d2ca2514b16a306a0edafb2aeb662470a6e"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "8cd5fddffe8b14356e5ef7011fd1a0223a96e568757f0e2c5c10eeffa179df87"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "e114923e4e680d562612b2d7346fef2b8320a5d4c4c4e0a3ced5a47973ca8bed"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "2e6ed069bc2a474d735031b1eec20337d8f392984de0ee68e096bb1d6b401545"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 2,
+          "sha256": "36b1ce4bb0974d0ffec7ef044c1673594c0081513b8ea38aef521993148b6247"
+        }
+      }
+    },
+    {
+      "name": "normal",
+      "run_id": "run-e2e-normal",
+      "image_sha256": "c690421c4253cf873aca4ae2cbc0592ab576a102e4d2ca51942e4d86deba1249",
+      "ground_truth_sha256": "25c3f31449650a14230203b8c8a1ea4cdabb48abe0d645054af738348375c57b",
+      "lines": 8,
+      "counts": {
+        "synth": {
+          "cards_expected": 1,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 130852
+        },
+        "vision": {
+          "markers": 1,
+          "cards": 1,
+          "clipped": 0,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 1,
+          "slots": 1,
+          "diagnostics": 0
+        },
+        "parser": {
+          "statements": 1,
+          "diagnostics": 0
+        },
+        "ir": {
+          "steps": 0,
+          "diagnostics": 1
+        },
+        "exec": {
+          "events": 1,
+          "steps_executed": 0,
+          "status": "ok",
+          "virtual_ms": 0.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "92aa7ba83d156ac49e239a84f0b4c2b7c19391085aabb11b7ac46993e60b7b8a"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "7e1837eef4d08951c1d4e6490640c670fd0eed553804df759776564a622a58dc"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "978a87d3cdccf1f1eec333792f4f25baabc7d54a08d1ce195958dc83210796ef"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "377173d2f9bc5a20386250cdbaff9b5713e7c1a828b4b9e30a51120ac217709e"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 2,
+          "sha256": "6dff9fbb5b83ce730a9574e7816d10e03a9eed0bb8d7ef326f30475ee46f27ff"
+        }
+      }
+    },
+    {
+      "name": "overlap",
+      "run_id": "run-e2e-overlap",
+      "image_sha256": "695b72213abb224f110a95ccf296ba034de3236a445ca52ed489fdd1efd6aa15",
+      "ground_truth_sha256": "59e417a222efa388fef9f1dc424cfef1019cbc26ec55a09ff1d21204ea22100e",
+      "lines": 8,
+      "counts": {
+        "synth": {
+          "cards_expected": 3,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 162891
+        },
+        "vision": {
+          "markers": 2,
+          "cards": 2,
+          "clipped": 0,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 1,
+          "slots": 1,
+          "diagnostics": 1
+        },
+        "parser": {
+          "statements": 1,
+          "diagnostics": 0
+        },
+        "ir": {
+          "steps": 0,
+          "diagnostics": 1
+        },
+        "exec": {
+          "events": 1,
+          "steps_executed": 0,
+          "status": "ok",
+          "virtual_ms": 0.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "a17d593b83fd86ac5f726b6813358793da9d1683896781221623f70325a3d8fa"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "5a24156a2d7cf79976de3380c669839b6b411c4f085ecf5fc65b5b19b88972e2"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "f603bb26598cef0ee4eddf3b2ea2b539d40930d729e8d06ff2a514bcac8ad75d"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "e0f3d69121fe63933afe22897dd729665c91e0812f693546bfd098c3ef9cfd8c"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 2,
+          "sha256": "e7f539e838988562061a8a5e2d99409de08f3f4962bb9d5c276c180e878dc688"
+        }
+      }
+    },
+    {
+      "name": "slight-rotation",
+      "run_id": "run-e2e-slight-rotation",
+      "image_sha256": "7e28704f458988ac722ca42f6cefe812b982a25ccb612993f76fc056593b19b3",
+      "ground_truth_sha256": "93ec365624f550342b78f833f0889debb910467cd0a42f075532d4567562a159",
+      "lines": 8,
+      "counts": {
+        "synth": {
+          "cards_expected": 3,
+          "width": 640,
+          "height": 480,
+          "image_bytes": 149873
+        },
+        "vision": {
+          "markers": 3,
+          "cards": 3,
+          "clipped": 0,
+          "unknown_card": 0
+        },
+        "layout": {
+          "rows": 1,
+          "slots": 3,
+          "diagnostics": 0
+        },
+        "parser": {
+          "statements": 0,
+          "diagnostics": 1
+        },
+        "ir": {
+          "steps": 0,
+          "diagnostics": 0
+        },
+        "exec": {
+          "events": 1,
+          "steps_executed": 0,
+          "status": "ok",
+          "virtual_ms": 0.0
+        }
+      },
+      "layers": {
+        "vision": {
+          "kinds": [
+            "MarkerCandidateList",
+            "CardCandidateList"
+          ],
+          "lines": 2,
+          "sha256": "bf98cbc3cad9936548ece7eb47619ef9086687945824ed6537b0c255ebac283d"
+        },
+        "layout": {
+          "kinds": [
+            "Layout"
+          ],
+          "lines": 1,
+          "sha256": "6b4729dd6812d8791e81ecd83c60c4725bb6958c4410162f2677a5a40c66cd67"
+        },
+        "parser": {
+          "kinds": [
+            "Ast"
+          ],
+          "lines": 1,
+          "sha256": "98e4f71505805e3389dc5663b199ca59994ff0bca750f4fc7a0aef07eaf298c4"
+        },
+        "ir": {
+          "kinds": [
+            "Ir"
+          ],
+          "lines": 1,
+          "sha256": "2e6ed069bc2a474d735031b1eec20337d8f392984de0ee68e096bb1d6b401545"
+        },
+        "exec": {
+          "kinds": [
+            "ExecEvent",
+            "ExecResult"
+          ],
+          "lines": 2,
+          "sha256": "f2ff411f2d03b05ad16009be769ebbdc51d7edbd95a34ee8000459535c879cbb"
+        }
+      }
+    }
+  ]
+}
