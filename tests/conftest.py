@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -86,3 +87,42 @@ def e2e_normal_run(e2e_out_dir: Path, context: SynthContext):
     from liveblocks.e2e import run_chain
 
     return run_chain("normal", out_dir=e2e_out_dir, context=context)
+
+
+# --- LB-030 采集台的公共夹具 ---------------------------------------------------------
+
+#: 采集台的固定时钟（落盘目录名与 JSON 时间戳因此是确定的）。
+SERVE_CAM_NOW = datetime(2026, 11, 24, 5, 15, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(scope="session")
+def serve_cam_scene_pngs() -> dict[str, bytes]:
+    """``{场景名: PNG 字节}``：直接读入库的 ``fixtures/scenes/*.png``（与 ``recognize detect`` 同一批图）。"""
+    pngs: dict[str, bytes] = {}
+    for path in sorted(SCENES_DIR.glob("*.png")):
+        pngs[path.stem] = path.read_bytes()
+    return pngs
+
+
+@pytest.fixture()
+def serve_cam(tmp_path: Path):
+    """一台「进程内」的采集台：固定时钟 + 确定性采集 id，采集根目录落在 tmp_path。"""
+    import itertools
+    from types import SimpleNamespace
+
+    from liveblocks.serve_cam import ServeCamApp, ServeCamConfig, TestClient
+    from liveblocks.serve_cam.captures import _default_capture_id  # noqa: PLC2701 - 复用时间戳形状
+
+    counter = itertools.count(1)
+
+    def fixed_id_factory(moment) -> str:
+        stamp = _default_capture_id(moment).rsplit("-", 1)[0]
+        return f"{stamp}-{next(counter):06x}"
+
+    config = ServeCamConfig(
+        live_dir=tmp_path / "live",
+        clock=lambda: SERVE_CAM_NOW,
+        capture_id_factory=fixed_id_factory,
+    )
+    app = ServeCamApp(config)
+    return SimpleNamespace(app=app, client=TestClient(app), live_dir=tmp_path / "live", config=config)

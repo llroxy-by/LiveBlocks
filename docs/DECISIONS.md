@@ -614,6 +614,59 @@ ADR 式：每条记录 **背景 / 决策 / 影响 / 待办**。推翻旧决策�
   `kind`，§1 的 `Frame` 与 §8 的行序要一起改，并同步 `src/liveblocks/ui/protocol.py` 的
   `KIND_RANK` 与本层的 `STAGE_KINDS`。
 
+## D-021 LB-030 采集台：零依赖 WSGI + 内联页面、裸灰度请求体、`LiveCaptureScene` 真值、`refused` 归档
+
+- **背景**：LB-030 要给「真实帧」开一条入口：浏览器 `getUserMedia` 选任意摄像头、单帧/连续取帧、
+  `POST /api/frame` 返回 §3 候选与叠加图、`POST /api/capture` 落盘人工标注、页面能标「识别错了」。
+  约束：**优先零新增依赖**、**不改 `PROTOCOL.md`**、采集目录必须能被 `recognize report` 直接消费。
+- **决策**（逐条都可回退）：
+  1. **HTTP 用标准库 `wsgiref`（线程化）**，不用 FastAPI/Flask：本地单用户服务，零依赖是硬约束；
+     WSGI 的调用形状（`app(environ, start_response)`）让测试可以在进程内驱动（`serve_cam.testing.TestClient`），
+     不起端口、不用第三方 TestClient。代价：没有路由框架、没有中间件，全部手写（路由表在本模块与
+     `docs/CAPTURE.md` 双份，文档缺口由测试反证）。
+  2. **页面是单文件内联 HTML**（CSS/JS 全内联，无 `<link>`、无 CDN、无第三方脚本）：断网可加载，
+     也是「验收③」唯一能机器核对的形态；导出的文件（`serve-cam page`）与服务返回的字节完全相同。
+  3. **三种请求体，但页面只走裸灰度**：`image/png`（8bit 灰度，测试与命令行用来与 `recognize detect`
+     逐字段对照）、`application/x-liveblocks-gray`（裸灰度 + `width`/`height`，页面用：浏览器做灰度
+     转换不需要 PNG 编码库，服务端也不需要解码彩图）、`application/json`（base64，方便 curl）。
+     不做彩色 PNG 解码：`synth.png.decode_gray` 只支持 8bit 灰度，扩展它会让 LB-002 的「字节可复现」
+     契约变宽——不在本单范围内（D-012 仍是边界）。
+  4. **帧令牌**：`/api/frame` 把最近 16 帧留在内存里并返回 `frame_token`，`/api/capture` 凭令牌取回
+     **同一帧**，不必二次上传，也保证「落盘的就是刚才识别的那一帧」。令牌是内存态：进程重启即失效
+     （`LB-C007`），落盘产物不受影响。
+  5. **实拍真值用 `LiveCaptureScene`**，不冒充 `SyntheticCardScene`：两者字段同构（`image.file` /
+     `card_layout` / `cards[].marker_id` / `marker_corners_px` / `center_px` / `status`），所以
+     `vision.stats.evaluate_directory` 只要多认一个 `kind`（新增 `SCENE_KINDS`），同一份统计、
+     同一套验收对照直接吃实拍样本。用同一个 `kind` 会让「合成」与「实拍」在文件名与报表里分不清。
+  6. **不猜坐标**：只有拿到四角（检出角点或人工填写）的卡才写进 `scene.json`；四角拿不到的卡留在
+     `capture.json` 的 `rejected_annotations` 里并给警告（`report_usable=false`）。理由：凭空坐标会
+     污染 `recognize report` 的角点/中心误差。唯一的例外是**唯一标注 + 唯一检出标记**时借用该标记
+     四边形，并记 `corner_source=detected-single-marker` + 警告。
+  7. **不拿检测结论冒充真值**：`status` 缺省 `ok` 且写 `status_assumed=true`；`center_px` 由
+     「标记四边形 + 卡面版式」外推，写 `center_source`。因此实拍样本的「卡片中心误差」只说明几何自洽，
+     不是拍摄精度（写进 `docs/CAPTURE.md` §8，不许当准确率引用）。
+  8. **`refused` 单独归档**：页面的「这帧识别错了」→ `outcome=misrecognised` → 落 `fixtures/live/refused/<时间戳>/`，
+     目录结构与正常样本完全相同，命令只差路径；这样正常样本的统计不会被坏样本稀释，坏样本仍可单独回归。
+  9. **`fixtures/live/` 不入库**（`.gitignore` 只放过 README）：实拍样本一采就变、没有「同种子重生成」，
+     入库等于把仓库变成相册。
+- **影响**：
+  - 新增模块 `src/liveblocks/serve_cam/`（协议常量、帧输入、叠加图、采集仓库、WSGI 应用、页面、服务器、
+    TestClient、文档核对），CLI 多一个 `serve-cam` 组；**唯一改动的上游文件是 `vision/stats.py` 的
+    `SCENE_KINDS`**（加法式，合成场景行为不变）。
+  - `bash scripts/check.sh` 仍是唯一检查入口，测试新增 6 个文件（见 `docs/PROGRESS.md`）。
+  - 服务默认只绑 `127.0.0.1`；`--host 0.0.0.0` 会暴露到局域网，**本服务不做鉴权**（「不做」的一条），
+    手机上的 `getUserMedia` 还需要 HTTPS 或 localhost——这两件事都留给运维侧隧道。
+- **发现的协议缺口（本 PR 只报告、不改 `docs/PROTOCOL.md`）**：见 `docs/CAPTURE.md` §9 —— `Frame`
+  没有设备标识与原始分辨率、§3 没有采集元数据位置、§9 没有采集侧码区间、§3 没有角点来源的表达、
+  没有定义「实拍场景真值」对象。
+- **发现的实现缺陷（不在本单修，先记录）**：`vision.stats._evaluate_result` 的「误检（extra）」在结构上
+  恒为 0（`identified_markers` 只在遍历真值卡片时填充，所以永远不会出现「真值里没有的 marker」）。
+  本单不改 LB-003 的统计口径（改了会动 LB-003 的报表与测试），但因此**不能拿「误检 0」当识别可靠的证据**；
+  LB-030 的 refused 样本只用「漏检 + 识别数 + 状态」来说明问题。
+- **待办**：① 协议冻结前把上面 5 条缺口并进 §2/§3/§9；② 若将来要支持彩色/JPEG 帧，需要先定义
+  「帧的来源与色彩格式」再扩展 `decode_gray`；③ `extra` 统计缺陷需要单独开单修（会把 LB-003 的报表
+  `误检` 列从恒 0 变成真实计数，属行为变更）。
+
 ## 待决问题索引（对应 `docs/ARCHITECTURE.md` §4）
 
 | 问题 | 内容 | 阻塞谁 |

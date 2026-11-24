@@ -296,7 +296,35 @@ fixtures/e2e/
 - 生成层复现了 `scenes/` 的入库图（同种子 → 同字节），所以基准里的 `image_sha256` 与
   `fixtures/scenes/*.png` 的 sha256 相同；`tests/test_e2e_pipeline.py` 逐字节断言这件事。
 
-## 10. 约定
+## 10. `live/`（LB-030 实拍采集，**不入库**）
+
+`fixtures/live/` 是采集台的落盘根目录：**每个样本一个子目录**，结构与 `scenes/` 的单个场景同构
+（`frame.png` + `scene.json` + `capture.json` + `index.json`），所以
+`liveblocks recognize report --dir fixtures/live/<id>` 直接能跑。
+
+```
+fixtures/live/
+├── README.md                      # 本目录的说明（唯一入库的文件）
+├── <时间戳>/                       # 人判可用的样本（outcome=accepted）
+│   ├── frame.png                  # 采集到的那一帧（8bit 灰度）
+│   ├── scene.json                 # kind=LiveCaptureScene：recognize report 读的真值
+│   ├── capture.json               # kind=LiveCaptureRecord：人工标注 + 当时的 §3 识别结果
+│   └── index.json                 # kind=LiveCaptureIndex：清单行（尺寸/像素摘要/张数）
+└── refused/<时间戳>/               # 人判「这帧识别错了」的样本（outcome=misrecognised）
+    └── （同上四件套）
+```
+
+- **为什么不入库**：这些是人在现场采的实拍数据（手机/摄像头、光照、手持角度都不同），
+  一采就变，而且没有「同种子重生成」这回事；入库会把仓库变成相册。`.gitignore` 里忽略
+  `fixtures/live/*`，只留本 README。
+- **和 `scenes/` 的关系**：字段同构是刻意的（同一份 `recognize report` 统计），`kind` 不同是因为
+  实拍与合成的可信度完全不同（`docs/DECISIONS.md` D-021）。
+- **真值的来源**：`card_id` / `role` / 角点来自人工标注；`status` 缺省 `ok` 且标
+  `status_assumed`；`center_px` 由「标记四边形 + 卡面版式」外推并标 `center_source`
+  （不是独立测量）。四角拿不到的卡**不进** `scene.json`（不猜坐标），只留在 `capture.json`。
+- 采集命令：`liveblocks serve-cam serve` → 浏览器打开打印出来的地址（细节见 `docs/CAPTURE.md`）。
+
+## 11. 约定
 
 
 1. 夹具必须是**确定性**的：生成脚本固定随机种子，重跑字节一致。

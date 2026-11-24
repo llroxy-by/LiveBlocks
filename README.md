@@ -7,7 +7,8 @@
 - 已完成 **LB-001 工程骨架**、**LB-002 合成卡片图像生成器**、**LB-003 识别模块**、**LB-004 排列还原**、**LB-005 语法解析**、**LB-006 规范化 IR**、**LB-007 模拟执行器** 与 **LB-008 调试视图**：可以按卡片字典与版式定义生成单卡 / 多卡场景（任意角度、间距、光照噪声、遮挡、裁切）的 ArUco 卡片图像并输出真值 JSON；也可以对这些图跑「ArUco 标记检测 → 卡片字典映射」，输出符合协议 §3 的 `MarkerCandidateList` / `CardCandidateList`，并给出一份可读的准确率 / 漏检统计；再把候选还原成符合协议 §4 的 `Layout`（行/槽位、阅读方向、朝向归一、去重与歧义诊断），最后按 P0 最小文法（语句序列 + 字面参数）把 `Layout` 读成符合协议 §5 的 `Ast`（每个节点带 `span` 与 `origin`，语法错误报 `LB-P0xx` 并定位到行/槽位/卡片），再把 `Ast` 规范化成符合协议 §6 的 `Ir`（确定性输出、显式 `limits`、`op` 按 op 表校验，问题报 `LB-I0xx` 并通过入库 JSON Schema 校验），最后用**模拟执行器**把 `Ir` 跑成协议 §7 的 `ExecEvent[]` + `ExecResult`（虚拟时钟、来自 IR 的步数/超时限制、步骤边界中断，事件一律 `backend:"sim"`），并附一份可读的最终状态 JSON。
 - **LB-008 调试视图**可以把一份 §8 运行记录（JSONL）渲染成**一屏五层**：帧叠加（原帧 + 标记框 / 卡片中心 / 槽位）、排列、AST、IR、事件流 + 分层耗时，支持**回放**与**单步**；坏记录只给可见的 `LB-U0xx` 提示而不崩溃。它**只读**、只服务开发者，不做产品级 UI、不对外发布。
 - **LB-009 端到端回归**把整条软件闭环收成一条命令：`liveblocks e2e run` 真跑「生成 → 识别 → 排列 → 解析 → IR → 模拟」六阶段并把 §8 运行记录落盘，`liveblocks e2e regression` 再做记录形状校验、**黄金基准**比对、**破坏注入自检**与**固定时间上界**（整份 ≤ 60 s、单条记录 ≤ 20 s），失败时打印失败摘要并点名「最早失败层」。运行记录的生产在包内完成，不依赖 LB-008 为夹具拼记录的脚本。
-- **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。
+- **LB-030 摄像头采集台**把「真实帧从哪来」这件事先接上：一条命令（`liveblocks serve-cam serve`）起本地服务，页面用浏览器 `getUserMedia` 选任意摄像头（手机前置/后置、笔记本内置、USB UVC），支持**单帧抓拍**与**连续取帧**；`POST /api/frame` 返回 §3 `CardCandidateList` 与识别叠加图，`POST /api/capture` 把当前帧与人工标注（卡片 id、角色、可选角点）落成 `fixtures/live/<时间戳>/`——**这份目录能被 `recognize report` 直接消费**；页面能标「这帧识别错了」，坏样本单独归档到 `fixtures/live/refused/`。零新增依赖（标准库 `wsgiref` + 内联 CSS/JS 的单文件页面）。
+- **模拟通过 ≠ 硬件验证**：识别与排列只在**合成图**上验证过，真实摄像头与实体卡片尚未验证（见 `docs/PROGRESS.md` §3）。LB-030 的离线验收（§3 逐字段一致、采集目录进 `recognize report`、页面无外网依赖）有真跑证据；但「手机后置摄像头 + 实体卡看到叠加框与卡片 id」这一条**待人工验证**（`docs/CAPTURE.md` §6 写了人怎么验）。
 - 首阶段目标是**纯软件闭环**：用合成的卡片图像代替摄像头、用模拟执行代替硬件，先把「识别 → 排列 → 解析 → 执行 → 反馈/调试」的整条链路和接口契约定下来。
 - 硬件（摄像头、主机、屏幕、实体卡片、电源与引脚）尚未选型确认，相关结论均为**待验证**。
 - 实现语言按 `docs/DECISIONS.md` D-011 暂定 Python 3.11+ / pytest（D-004 仍为提案，换语言只需替换 `pyproject.toml` 与 `scripts/check.sh`）。
@@ -276,6 +277,39 @@ liveblocks ui view --record runs/e2e/normal.jsonl
 规范与 `LB-E0xx` 码表见 [docs/E2E.md](docs/E2E.md)（草案 `e2e_version` 0.0.1），
 取舍与 `PROTOCOL.md` §8/§9 的缺口清单见 [docs/DECISIONS.md](docs/DECISIONS.md) D-020。
 
+## 摄像头采集台（LB-030）
+
+真实帧的来源：一条命令起本地服务，页面用浏览器 `getUserMedia` 选任意摄像头（手机前置/后置、
+笔记本内置、USB UVC 走同一条路径），单帧抓拍或连续取帧，识别在服务端跑（零新增依赖）。
+
+```bash
+# 一条命令起服务（默认只绑 127.0.0.1:8765），然后用浏览器打开打印出来的地址
+liveblocks serve-cam serve
+
+# 换端口 / 换采集根目录 / 指定默认卡纸版式
+liveblocks serve-cam serve --port 9000 --card-layout card-60x40
+
+# 只打印地址与采集目录就退出（脚本/自检用，不绑端口）
+liveblocks serve-cam serve --print-url-only
+
+# 把页面导成单个 HTML：断网也能打开（自带 CSS/JS，无外链、无 CDN）
+liveblocks serve-cam page --out /tmp/lb030-page.html
+
+# 采到的样本目录就是场景目录，直接喂给识别统计
+liveblocks recognize report --dir fixtures/live/<时间戳>
+```
+
+- `POST /api/frame` 返回的 `card_candidate_list` 与 `liveblocks recognize detect` 命令行的输出
+  **逐字段一致**（同一段识别代码、同一 `frame_id` 规则），叠加图 PNG 与原帧同尺寸；
+- `POST /api/capture` 落成 `fixtures/live/<时间戳>/`（`frame.png` + `scene.json` + `capture.json`
+  + `index.json`），`scene.json` 的 `kind` 是 `LiveCaptureScene`，与合成真值字段同构；
+- 页面上的「这帧识别错了」把样本归到 `fixtures/live/refused/`，坏样本与正常样本分开跑；
+- 不做：视频录制与上传、多用户与账号、公网鉴权（隧道侧负责）、不改 `docs/PROTOCOL.md`。
+
+验收状态（如实）：① ② ③ 离线可复现（`pytest tests/test_serve_cam.py`），**④ 手机后置摄像头 +
+实体卡 = 待人工验证**。规范与错误码见 [docs/CAPTURE.md](docs/CAPTURE.md)（草案
+`capture_version` 0.0.1），取舍见 [docs/DECISIONS.md](docs/DECISIONS.md) D-021。
+
 ## 文档入口
 
 | 文档 | 内容 | 状态 |
@@ -288,6 +322,7 @@ liveblocks ui view --record runs/e2e/normal.jsonl
 | [docs/EXEC.md](docs/EXEC.md) | S6 模拟执行层规范（虚拟时钟、op 语义表、limits 判定顺序、中断、`LB-R0xx` 码表、`ExecState`），**草案** | 草案 v0.0.1（`exec_version` 0.0.1） |
 | [docs/UI.md](docs/UI.md) | S7b 调试视图规范（一屏五层、运行记录要求、回放与单步、`LB-U0xx` 码表），**草案** | 草案 v0.0.1（`ui_version` 0.0.1） |
 | [docs/E2E.md](docs/E2E.md) | 端到端回归规范（六阶段链路、§8 记录的生产、黄金基准、失败摘要、固定时间上界、`LB-E0xx` 码表），**草案** | 草案 v0.0.1（`e2e_version` 0.0.1） |
+| [docs/CAPTURE.md](docs/CAPTURE.md) | 摄像头采集台规范（`getUserMedia` 页面、`/api/frame` / `/api/capture` / `/api/captures`、`fixtures/live/` 落盘结构、`LB-C0xx` 码表、人工验证步骤），**草案** | 草案 v0.0.1（`capture_version` 0.0.1） |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 按优先级与依赖排列的 Backlog，可直接拆成 Issue | 基线草案 |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | 已定决策与待决问题记录（ADR 式） | 持续更新 |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | 已验证 / 计划中 / 待硬件验证 三态进度与验证证据 | 持续更新 |
@@ -312,16 +347,17 @@ liveblocks ui view --record runs/e2e/normal.jsonl
 ├── src/liveblocks/       # 实现包
 │   ├── __init__.py
 │   ├── __main__.py       # python -m liveblocks
-│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout … / parse … / ir … / exec …
+│   ├── cli.py            # liveblocks --version / synth … / recognize … / layout … / parse … / ir … / exec … / e2e … / ui … / serve-cam …
 │   ├── data/             # 卡片字典、ArUco 位表、版式定义、点阵字体（JSON）
 │   ├── synth/            # LB-002 合成卡片图像生成器（不做识别）
 │   ├── vision/           # LB-003 识别模块（标记候选 → 卡片候选、统计）
 │   ├── layout/           # LB-004 排列层（卡片候选 → Layout、自检报告）
 │   ├── parser/           # LB-005 语法层（Layout → Ast、P0 文法定义与自检报告）
 │   ├── ir/               # LB-006 规范化层（Ast → Ir、op 表、schema 校验与自检报告）
-│   └── runtime/          # LB-007 模拟执行层（Ir → ExecEvent[] + ExecResult、虚拟时钟、limits、中断）
+│   ├── runtime/          # LB-007 模拟执行层（Ir → ExecEvent[] + ExecResult、虚拟时钟、limits、中断）
+│   └── serve_cam/        # LB-030 摄像头采集台（WSGI 服务 + 自包含页面 + fixtures/live 落盘）
 ├── tests/                # pytest 用例，testpaths = tests
-├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）+ exec/（执行夹具与 golden 事件流/最终状态）
+├── fixtures/             # 测试夹具：skeleton.json + scenes/（合成图像与真值）+ layouts/（卡片候选）+ ast/（语法夹具）+ ir/（规范化夹具与 golden）+ exec/（执行夹具与 golden 事件流/最终状态）+ runs/ + e2e/ + live/（LB-030 实拍样本，不入库）
 ├── scripts/check.sh      # 本地检查脚本，与 CI 同一条命令
 └── docs/                 # 架构、协议草案、硬件、路线图、决策、进度
 ```

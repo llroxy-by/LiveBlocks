@@ -13,6 +13,10 @@ dist/
 # 记录里的 `timings_ms` 是实测墙钟，每跑一次都不一样，不入库）
 runs/
 
+# LB-030 实拍采集样本（人现场采的，一采就变；只留目录说明）
+fixtures/live/*
+!fixtures/live/README.md
+
 # 测试产物
 .pytest_cache/
 .coverage
